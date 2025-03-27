@@ -1,0 +1,8 @@
+"0","knn_results <- tune_model(knn_workflow, knn_grid, ""K-Nearest Neighbors"")"
+"1","K-Nearest Neighbors"
+"1"," "
+"1","elasped tuning time approximately:"
+"1"," "
+"1","31.3044"
+"1"," "
+"1","seconds"

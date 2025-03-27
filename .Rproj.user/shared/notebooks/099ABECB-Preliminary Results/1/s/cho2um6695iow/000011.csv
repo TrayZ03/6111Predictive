@@ -1,0 +1,5 @@
+"0","# # create table with kable, and modify heights - this print nicely and gets all columns on same page"
+"0","# kable(data_dict, ""html"") %>%"
+"0","#   kable_styling(full_width = F, position = ""left"") %>%"
+"0","#   column_spec(1, width = ""300px"") %>%  # Adjust width as needed"
+"0","#   column_spec(2, width = ""300px"")      # Adjust width as needed"

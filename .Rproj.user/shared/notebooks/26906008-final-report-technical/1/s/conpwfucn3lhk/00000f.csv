@@ -1,0 +1,2 @@
+"0","head(model_data %>%"
+"0","  select(where(is.factor)))"

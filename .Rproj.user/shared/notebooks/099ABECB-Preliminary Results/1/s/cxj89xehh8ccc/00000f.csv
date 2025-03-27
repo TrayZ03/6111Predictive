@@ -1,0 +1,2 @@
+"0","cleaned_data <-data[, -1 ]  # Remove the first column"
+"0","cleaned_data"

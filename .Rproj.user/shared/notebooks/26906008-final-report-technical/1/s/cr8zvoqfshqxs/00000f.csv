@@ -1,0 +1,20 @@
+"0","p1 <- plot_ly(eng_feat, "
+"0","              x = ~Av_Trans, "
+"0","              type = 'histogram', "
+"0","              name = 'Average Customer Transaction Amount') %>%"
+"0","  layout(title = ""Histogram of Average Customer Transaction Amount"","
+"0","             xaxis = list(title = ""Values""),"
+"0","             yaxis = list(title = ""Frequency"")"
+"0","             )"
+"1","[1m[33mError[39m:[22m
+[38;5;232m[33m![38;5;232m [90m[conflicted][38;5;232m [1mlayout[22m found in 2 packages.
+Either pick the one you want with `::`:
+[36m•[38;5;232m [34mplotly[38;5;232m::layout
+[36m•[38;5;232m [34mgraphics[38;5;232m::layout
+Or declare a preference with `]8;;ide:help:conflicted::conflicts_preferconflicted::conflicts_prefer]8;;()`:
+[36m•[38;5;232m ]8;;ide:run:conflicted::conflicts_prefer(plotly::layout)conflicted::conflicts_prefer(plotly::layout)]8;;
+[36m•[38;5;232m ]8;;ide:run:conflicted::conflicts_prefer(graphics::layout)conflicted::conflicts_prefer(graphics::layout)]8;;[39m
+Backtrace:
+[90m 1. [39m... %>% ...
+[90m 2. [39m[1mconflicted[22m (local) [1m[94m`<fn>`([39m[22m[1m[94m)[39m[22m
+"

@@ -1,0 +1,24 @@
+{
+    "id": "F3D1E49E",
+    "path": "/cloud/project/lodgepole_pine_example_roc_calibration.R",
+    "project_path": "lodgepole_pine_example_roc_calibration.R",
+    "type": "r_source",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1714527133187.0,
+    "source_on_save": false,
+    "relative_order": 9,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1713537697,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1713537697,
+    "read_only": false,
+    "read_only_alternatives": []
+}

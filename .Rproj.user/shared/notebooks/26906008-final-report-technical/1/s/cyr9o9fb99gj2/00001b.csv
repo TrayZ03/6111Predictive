@@ -1,0 +1,3 @@
+"0","# read .csv in as a tibble"
+"0","data <- as_tibble(read.csv(""customer_data.csv"")) # modify local path to file"
+"0","data"

@@ -1,0 +1,8 @@
+"0","lr_results <- tune_model(lr_workflow, lr_grid, ""Logistic Regression"")"
+"1","Logistic Regression"
+"1"," "
+"1","elasped tuning time approximately:"
+"1"," "
+"1","2.983304"
+"1"," "
+"1","seconds"

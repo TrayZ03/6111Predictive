@@ -1,0 +1,8 @@
+"0","lr_mod <- "
+"0","  logistic_reg(penalty = tune(), mixture = 1) %>% "
+"0","  set_engine(""glmnet"")"
+"0",""
+"0","knn_mod <- "
+"0","  nearest_neighbor(neighbors = tune()) %>% "
+"0","  set_mode(""classification"") %>%"
+"0","  set_engine(""kknn"")"

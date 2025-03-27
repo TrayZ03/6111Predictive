@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<style>body{background-color:white;}</style>
+<script src="lib/jquery-3.6.0/jquery-3.6.0.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="lib/bootstrap-3.3.5/css/cosmo.min.css" rel="stylesheet" />
+<script src="lib/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+<script src="lib/bootstrap-3.3.5/shim/html5shiv.min.js"></script>
+<script src="lib/bootstrap-3.3.5/shim/respond.min.js"></script>
+<style>h1 {font-size: 34px;}
+       h1.title {font-size: 38px;}
+       h2 {font-size: 30px;}
+       h3 {font-size: 24px;}
+       h4 {font-size: 18px;}
+       h5 {font-size: 16px;}
+       h6 {font-size: 12px;}
+       code {color: inherit; background-color: rgba(0, 0, 0, 0.04);}
+       pre:not([class]) { background-color: white }</style>
+<script src="lib/kePrint-0.0.1/kePrint.js"></script>
+<link href="lib/lightable-0.0.1/lightable.css" rel="stylesheet" />
+
+</head>
+<body>
+<table class="table table-striped" style="font-size: 12px; margin-left: auto; margin-right: auto;">
+ <thead>
+  <tr>
+   <th style="text-align:left;"> Variable </th>
+   <th style="text-align:left;"> Definition </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;width: 500px; "> CLIENTNUM </td>
+   <td style="text-align:left;width: 500px; "> Client number. Unique identifier for the customer holding the account </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Attrition_Flag </td>
+   <td style="text-align:left;width: 500px; "> Internal event (customer activity) variable - if the account is closed then 1 else 0 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Customer_Age </td>
+   <td style="text-align:left;width: 500px; "> Demographic variable - Customer's Age in Years </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Gender </td>
+   <td style="text-align:left;width: 500px; "> Demographic variable - M=Male, F=Female </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Dependent_count </td>
+   <td style="text-align:left;width: 500px; "> Demographic variable - Number of dependents </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Education_Level </td>
+   <td style="text-align:left;width: 500px; "> Demographic variable - Educational Qualification of the account holder (example: high school, college graduate, etc.) </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Marital_Status </td>
+   <td style="text-align:left;width: 500px; "> Demographic variable - Married, Single, Divorced, Unknown </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Income_Category </td>
+   <td style="text-align:left;width: 500px; "> Demographic variable - Annual Income Category of the account holder </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Card_Category </td>
+   <td style="text-align:left;width: 500px; "> Product Variable - Type of Card (Blue, Silver, Gold, Platinum) </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Months_on_book </td>
+   <td style="text-align:left;width: 500px; "> Period of relationship with bank </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Total_Relationship_Count </td>
+   <td style="text-align:left;width: 500px; "> Total no. of products held by the customer </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Months_Inactive_12_mon </td>
+   <td style="text-align:left;width: 500px; "> No. of months inactive in the last 12 months </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Contacts_Count_12_mon </td>
+   <td style="text-align:left;width: 500px; "> No. of Contacts in the last 12 months </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Credit_Limit </td>
+   <td style="text-align:left;width: 500px; "> Credit Limit on the Credit Card </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Total_Revolving_Bal </td>
+   <td style="text-align:left;width: 500px; "> Total Revolving Balance on the Credit Card </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Avg_Open_To_Buy </td>
+   <td style="text-align:left;width: 500px; "> Open to Buy Credit Line (Average of last 12 months) </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Total_Amt_Chng_Q4_Q1 </td>
+   <td style="text-align:left;width: 500px; "> Change in Transaction Amount (Q4 over Q1) </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Total_Trans_Amt </td>
+   <td style="text-align:left;width: 500px; "> Total Transaction Amount (Last 12 months) </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Total_Trans_Ct </td>
+   <td style="text-align:left;width: 500px; "> Total Transaction Count (Last 12 months) </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Total_Ct_Chng_Q4_Q1 </td>
+   <td style="text-align:left;width: 500px; "> Change in Transaction Count (Q4 over Q1) </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;width: 500px; "> Avg_Utilization_Ratio </td>
+   <td style="text-align:left;width: 500px; "> Average Card Utilization Ratio </td>
+  </tr>
+</tbody>
+</table> <script type="text/x-mathjax-config">MathJax.Hub.Config({tex2jax: {inlineMath: [["$","$"]]}})</script><script async src="https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+</body>
+</html>

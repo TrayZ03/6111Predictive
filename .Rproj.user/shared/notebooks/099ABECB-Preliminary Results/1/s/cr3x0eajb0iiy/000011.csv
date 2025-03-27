@@ -1,0 +1,5 @@
+"0","rec <- recipe(Attrition_Flag ~ ., data = train_set) %>%"
+"0","  step_other(Education_Level, Marital_Status, Income_Category, Card_Category) %>% "
+"0","  step_dummy(all_nominal_predictors()) %>%"
+"0","  step_center(all_predictors()) %>%"
+"0","  step_scale(all_predictors())"

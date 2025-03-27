@@ -1,0 +1,8 @@
+"0","null_test_results <- "
+"0","  test_set %>%"
+"0","  select(Attrition_Flag)"
+"0",""
+"0","null_test_results$.pred_Attrited.Customer <- 0"
+"0","null_test_results$.pred_Existing.Customer <- 1"
+"0",""
+"0","null_test_results"

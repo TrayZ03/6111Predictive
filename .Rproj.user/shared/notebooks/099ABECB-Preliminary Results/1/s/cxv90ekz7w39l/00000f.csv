@@ -1,0 +1,7 @@
+"0","top_knn_models <-"
+"0","  knn_results %>% "
+"0","  show_best(metric = ""roc_auc"", n = 10) %>%"
+"0","  mutate(mean_roc_auc=mean,"
+"0","         std_err_roc_auc=std_err) %>%"
+"0","   select(neighbors, mean_roc_auc, std_err_roc_auc)"
+"0","top_knn_models"

@@ -1,0 +1,8 @@
+"0","rf_results <- tune_model(rf_workflow, rf_grid, ""Random Forest"")"
+"1","Random Forest"
+"1"," "
+"1","elasped tuning time approximately:"
+"1"," "
+"1","1.845929"
+"1"," "
+"1","seconds"

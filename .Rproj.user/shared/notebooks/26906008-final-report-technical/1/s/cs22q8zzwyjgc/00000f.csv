@@ -1,0 +1,8 @@
+"0","nb_results <- tune_model(nb_workflow, nb_grid, ""Naive Bayes"")"
+"1","Naive Bayes"
+"1"," "
+"1","elasped tuning time approximately:"
+"1"," "
+"1","2.732938"
+"1"," "
+"1","seconds"

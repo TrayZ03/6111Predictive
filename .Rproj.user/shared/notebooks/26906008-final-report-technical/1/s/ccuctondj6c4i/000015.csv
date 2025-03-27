@@ -1,0 +1,5 @@
+"0","card_cat_dist <- cleaned_data %>%"
+"0","  group_by(Card_Category) %>%"
+"0","  summarize(Count=n()) %>%"
+"0","  mutate(Proportion=round(Count/sum(Count), 2))"
+"0","card_cat_dist"

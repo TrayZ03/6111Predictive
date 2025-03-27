@@ -1,0 +1,1782 @@
+---
+title: "Predictive Modeling Of Customer Attrition"
+author: "Tracey Zicherman"
+date: ""
+output: word_document
+always_allow_html: true
+    # 
+    # :
+    # toc: true
+    # toc-depth: 3
+    # toc-title: "Contents"
+    # output-file: "Predictive_Modeling_Customer_Attrition.docx"
+  # html:
+  #   df_print: "paged"
+  #   toc: true
+  #   toc-depth: 3
+  #   toc-title: "Contents"
+  #   toc-own-page: true
+  #   toc-number: true
+  #   toc-float:
+  #     align: "right"
+  #     width: "300px"
+  #   output-file: "Predictive_Modeling_Customer_Attrition.html"
+---
+
+
+
+```{r install_and_load_packages, echo=FALSE, include=FALSE}
+### Setup
+
+# install libraries - un-comment if needed
+# install.packages("tidyverse")
+# install.packages("kableExtra")
+# install.packages("leaps")
+# install.packages("caret")
+# install.packages("tidymodels")
+# install.packages("xgboost")
+# install.packages("vip")
+# install.packages("recipes")
+# install.packages("kknn")
+# install.packages("dials")
+# install.packages("klaR")
+# install.packages("discrim")
+# install.packages("ranger")
+# install.packages("glmnet")
+# install.package("gridExtra")
+# install.packages("officer")
+# install.packages("officedown")
+# install.packages("plotly")
+
+# load libraries
+library(tidyverse)
+library(kableExtra)
+library(gridExtra)
+library(leaps)
+library(caret)
+library(tidymodels)
+library(xgboost)
+library(vip)
+library(recipes)
+library(kknn)
+library(dials)
+library(klaR)
+library(discrim)
+library(ranger)
+library(glmnet)
+library(plotly)
+tidymodels_prefer()
+conflicted::conflicts_prefer(caret::contr.dummy)
+```
+
+## [INCOMPLETE] Executive Summary
+
+Think "summary" or "long abstract" oriented towards client/stakeholder
+***SIDEKICK: TO DO - Complete after other sections.***
+Suggested outline:
+
+1. Business motivation
+2. High level summarize overall approach (see below)
+3. High level summarize key findings and evaluation
+4. [INCOMPLETE] Recommendations (think suggested decisions and actions)
+
+## Approach and Data
+
+### Overall Approach
+
+Our overall approach to solving the problem of predictive modeling of customer churn can be summarized as follows:
+
+1. Perform basic cleaning and manipulating of raw customer data.
+2. Explore raw customer data to understand features of customer behavior and possible relationships to customer churn, with an eye towards predictive modeling.
+3. Engineer new customer features from pre-existing features.
+4. Perform additional steps to maximize the predictive values of both pre-existing and engineered features
+5. Process the resulting data to prepare for predictive modeling with machine learning algorithms.
+6. Fit an tune 5 baseline classification machine learning algorithms which be used to predict whether a given customer will churn based on  features. 
+7. Evaluate the tuned baseline models on a number of different metrics to determine which is the best candidate for a final model.
+8. Select a final model and interpret it to gain insights into the relationship between customer features and customer churn.
+
+
+### Analytic and Informational Goals
+
+The overall, high level goal, is to learn as much as possible about the relationship between customer behavior, as measured by the features present in the dataset, and customer churn (attrition), and also to predict whether a customer will churn or not, based on a given set of values for these features, as accurately as possible.
+
+Both interpretative and predictive modeling have clear value -- for example, both can be used to guide business decisions and policy, to and understand the customer base. It is perhaps helpful to think of them as complementary, since they may inform 
+different decisions. For example, interpreting the relationship between demographic features and customer churn can inform marketing campaigns or retention policy, while predicting whether particular customers will churn can inform other strategic decisions.
+
+When the two goals are in conflict, as they sometimes are in predictive modeling, we will tend to prefer making choices that favor the predictive modeling side.
+
+
+### Data
+
+#### [APPENDIX OPTION] Data Dictionary 
+
+This is data dictionary for this dataset, which includes each customer feature and a brief description.
+
+```{r data_dict, include=FALSE}
+# read data dictionary into tibble
+data_dict <- read_tsv('project_data_dictionary.txt') %>%
+  rename(Feature=Variable)
+
+# create table with kable, and modify heights - this print nicely and gets all columns on same page
+kable(data_dict, "html") %>%
+  kable_styling("striped", full_width = TRUE, font_size=12) %>%
+  column_spec(1, width = "500px") %>%  # Adjust width as needed
+  column_spec(2, width = "500px")      # Adjust width as needed
+```
+
+We note the following:
+
+1. The client number is a unique identifier for internal purposes, and should have no real predictive value for the customer attrition.
+2. Customer attrition is measured by a binary (true/false) feature which says whether or not the given account is closed. This will be our predictive target, the feature we are aiming to predict. 
+3. There are 4 demographic features, corresponding to customer's age, gender, number of dependents, education level, marital status, and level of income.
+4. A single product feature described the customer's credit card category.
+5. The remaining 12 features describe various aspects of the customer's credit card related behavior.
+
+We observe features which fall into a number of different categories. For example, there are demographic features (which *a proiri* contain no time information) and financial features, with time information (e.g. `Total_Trans_Amt`) and without time information (e.g. `Credit_Limit`). 
+
+Some features with time information measure customer behavior over the last twelve months (e.g. `Months_Inactive_12_mon`) while others measure on a longer time scale (e.g. `Months_on_book`) so we can assume that data are a snapshot of customer behavior over different timescales.
+
+The predictive modeling task can be thought of as - given this snapshot of customer features at a moment in time, what is the likelihood their account will be closed at that same moment.
+
+Given such a disparate mix of features, we were optimistic that we would be able to predict customer churn with a reasonable high level of accuracy, and this was borne out in our investigation.
+
+
+#### Load Data
+
+Here is a snapshot of the dataset
+
+```{r load_data, echo=FALSE, warnings=FALSE, messages=FALSE}
+# read .csv in as a tibble
+data <- as_tibble(read.csv("customer_data.csv")) # modify local path to file
+data
+```
+
+
+
+#### Data Preparation
+
+In preliminary work, we investigation determined that errors and duplicates did not appear to be an issue. The amount of data processing needed was minimal, and included:
+
+1. ***Removing unnecessary or problematic features***. Since the client number has no known predictive value, this was removed from the data before modeling.
+2. ***Enforcing the correct data types for features***. This step enabled the features to be recognized correctly by modeling algorithms.
+3. ***Encoding missing values***. Since roughly 30% of the data contained missing values, these were encoded using the "Unknown" label, which could be processed as an additional possibility for the predictive modeling step.
+
+
+```{r preprocessing, include=FALSE}
+# step 1. remove first column
+cleaned_data <- data %>%
+  select(!CLIENTNUM)
+
+# step 2. mutate each chr categorical to fct
+cleaned_data <- cleaned_data %>%
+  mutate(Attrition_Flag = as.factor(Attrition_Flag),
+         Gender = as.factor(Gender),
+         Education_Level = as.factor(Education_Level),
+         Marital_Status = as.factor(Marital_Status),
+         Income_Category = as.factor(Income_Category),
+         Card_Category = as.factor(Card_Category)
+         )
+
+glimpse(cleaned_data)
+```
+
+After preliminary cleaning steps 2 the dataset looks ready for feature engineering. All remaining features are relevant, and are represented by the correct data types, namely `fct` for categorical features, `int` for discrete numerical (integer) features, and `dbl` for continuous numerical features.
+
+
+#### Descriptive Statistics and Visualizations
+
+Now we present some statistics and plots relevant to the overall predictive modeling task, specifically with an eye towards feature engineering.
+
+***SIDEKICK: What we have included is mostly univariate exploratory data analysis [EDA], which looks at individual features. Under normal circumstances, given enough time we would also include more bivariate analysis, which looks at the relationship between pairs of features, and specifically where one member of the pair is the target feature, customer attrition. What we have should be sufficient for the course, given the instructor's response to the Preliminary Steps.***
+
+##### Categorical Features
+
+The categorical features present in the dataset are
+
+```{r cat_feat_colnames, echo=FALSE, warnings=FALSE, messages=FALSE}
+colnames(cleaned_data %>%
+  select(where(is.factor)))
+```
+
+Now, we visualize the distribution in the dataset of all categorical features. Our main goals with this visualization are:
+
+1. To get a quick basic visual sense of the how these features are distributed among the customers represented in the data
+2. Inform feature engineering, both the creation of new features, and the modification or transformation of existing ones.
+3. Identify any potential issues or corrective action that might be advisable before using these features for predictive modeling.
+
+```{r cat_feat_dist_plots, echo=FALSE, warnings=FALSE, messages=FALSE}
+# create summary tibble with proportions of each Attrition_Flag value
+
+p1 <- plot_ly(cleaned_data %>%
+                group_by(Attrition_Flag) %>%
+                summarize(Count=n()) %>%
+                mutate(Proportion=round(Count/sum(Count), 2)), 
+              x = ~Attrition_Flag,
+              y = ~Proportion,
+              type = 'bar', 
+              name = 'Attrition_Flag') %>%
+  plotly::layout(title = " Customer Attrition",
+             xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+             yaxis = list(title = "Frequency")
+             )
+p2 <- plot_ly(cleaned_data %>%
+                group_by(Gender) %>%
+                summarize(Count=n()) %>%
+                mutate(Proportion=round(Count/sum(Count), 2)), 
+              x = ~Gender, 
+              y = ~Proportion,
+              type = 'bar', 
+              name = 'Gender') %>%
+  plotly::layout(title = " Customer Gender",
+             xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+             yaxis = list(title = "Frequency")
+             )
+p3 <- plot_ly(cleaned_data %>%
+                group_by(Education_Level) %>%
+                summarize(Count=n()) %>%
+                mutate(Proportion=round(Count/sum(Count), 2)), 
+              x = ~Education_Level, 
+              y = ~Proportion,
+              type = 'bar', 
+              name = 'Attrition_Flag') %>%
+  plotly::layout(title = " Customer Education Level",
+             xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+             yaxis = list(title = "Frequency")
+             )
+p4 <- plot_ly(cleaned_data %>%
+                group_by(Marital_Status) %>%
+                summarize(Count=n()) %>%
+                mutate(Proportion=round(Count/sum(Count), 2)), 
+              x = ~Marital_Status, 
+              y = ~Proportion,
+              type = 'bar', 
+              name = 'Marital_Status') %>%
+  plotly::layout(title = " Customer Marital Status",
+             xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+             yaxis = list(title = "Frequency")
+             )
+p5 <- plot_ly(cleaned_data %>%
+                group_by(Income_Category) %>%
+                summarize(Count=n()) %>%
+                mutate(Proportion=round(Count/sum(Count), 2)), 
+              x = ~Income_Category, 
+              y = ~Proportion,
+              type = 'bar', 
+              name = 'Income_Category') %>%
+  plotly::layout(title = " Customer Income Category",
+             xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+             yaxis = list(title = "Frequency")
+             )
+p6 <- plot_ly(cleaned_data %>%
+                group_by(Card_Category) %>%
+                summarize(Count=n()) %>%
+                mutate(Proportion=round(Count/sum(Count), 2)), 
+              x = ~Card_Category, 
+              y = ~Proportion,
+              type = 'bar', 
+              name = 'Card_Category') %>%
+  plotly::layout(title = " Customer Card Category",
+             xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+             yaxis = list(title = "Frequency")
+             )
+
+final_plot <- subplot(p1, p2, p3, p4, p5, p6,
+                      nrows = 3, 
+                      margin = 0.08) %>%
+      plotly::layout(title = "Dataset Distributions of Categorical Features",
+             showlegend = TRUE,
+             legend = list(x = 0.5, y = -0.1, orientation = 'h', xanchor = 'center', yanchor = 'top'))
+
+final_plot
+```
+
+From these distribution plots, we make the following observations:
+
+- The proportion of churned customers ("attrited" customers, i.e. customers with closed accounts) is relatively low compared to customers who haven't churned.
+- The overall proportions of female and male customers are more balanced, but with a slightly higher proportion of females.
+- The most frequently occurring educational level was graduate, followed by high school. There were relatively fewer customers with doctorate or post-graduate educational level. A reasonably high proportion of customers have unknown educational level
+- Almost all customers were either married or single, with a relatively small minority being divorced or of unknown status.
+- The most frequently occurring income level by far was the lowest, namely `Income_Category == 'Less than $40k`. Whether this reflects something about the customer base or the underlying population is unknown.
+
+We note that customer attrition, marital status, and card category stand out as somewhat unbalanced features. First we look at their individual distributions in the data.
+
+```{r attr_dist, echo=FALSE, warnings=FALSE, messages=FALSE}
+attr_dist <- cleaned_data %>%
+  group_by(Attrition_Flag) %>% # group by feature
+  summarize(Count=n()) %>% # summarize by count to get frequency
+  mutate(Proportion=round(Count/sum(Count), 2)) # mutation to convert frequency to a proportion
+attr_dist
+```
+
+```{r mar_status_dist, echo=FALSE, warnings=FALSE, messages=FALSE}
+mar_status_dist <- cleaned_data %>%
+  group_by(Marital_Status) %>%
+  summarize(Count=n()) %>%
+  mutate(Proportion=round(Count/sum(Count), 2))
+mar_status_dist
+```
+
+```{r card_cat_dist, echo=FALSE, warnings=FALSE, messages=FALSE}
+card_cat_dist <- cleaned_data %>%
+  group_by(Card_Category) %>%
+  summarize(Count=n()) %>%
+  mutate(Proportion=round(Count/sum(Count), 2))
+card_cat_dist
+```
+
+Since customer attrition is the predictive target, and the imbalance is relatively moderate, we won't take any corrective measures here. Card category is however extremely unbalanced, so we will re-code this into two categories. 
+
+Finally for marital status, divorced and unknown values only represent small proportions of customers, but it doesn't make sense to bin these (since information will be erased). Since the proportions aren't too small (single digit percentages), we won't take any corrective measures for this feature either.
+
+##### Numerical Features
+
+Now we turn our attention to numerical (continuous or integer) features. As with the categorical features, we aim to get a sense of how the numerical features are distributed, inform feature engineering, and identify and correct any issues with these features that may affect predictive modeling.
+
+These are numerical features present in the dataset
+
+```{r num_feat_colname, echo=FALSE, warnings=FALSE, messages=FALSE}
+colnames(cleaned_data %>%
+  select(where(is.numeric) |
+         where(is.integer)
+         )
+  )
+```
+
+Now let's look at histograms for the first seven numerical features.
+
+```{r num_feat_dist_plots1, echo=FALSE, warnings=FALSE, messages=FALSE}
+
+p1 <- plot_ly(cleaned_data, x = ~Customer_Age, type = 'histogram', name = 'Customer_Age') %>%
+      plotly::layout(title = (data_dict %>% filter(Feature == "Customer_Age"))$Definition, 
+                     xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+                     yaxis = list(title = "Frequency")
+             )
+p2 <- plot_ly(cleaned_data, x = ~Dependent_count, type = 'histogram', name = 'Dependent_count') %>%
+      plotly::layout(title = (data_dict %>% filter(Feature == "Dependent_count"))$Definition, 
+                     xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+                     yaxis = list(title = "Frequency")
+             )
+p3 <- plot_ly(cleaned_data, x = ~Months_on_book, type = 'histogram', name = 'Months_on_book') %>%
+      plotly::layout(title = (data_dict %>% filter(Feature == "Months_on_book"))$Definition, 
+                     xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+                     yaxis = list(title = "Frequency")
+             )
+p4 <- plot_ly(cleaned_data, x = ~Total_Relationship_Count, type = 'histogram', name = 'Total_Relationship_Count') %>%
+      plotly::layout(title = (data_dict %>% filter(Feature == "Total_Relationship_Count"))$Definition, 
+                     xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+                     yaxis = list(title = "Frequency")
+             )
+p5 <- plot_ly(cleaned_data, x = ~Months_Inactive_12_mon, type = 'histogram', name = 'Months_Inactive_12_mon') %>%
+      plotly::layout(title = (data_dict %>% filter(Feature == "Months_Inactive_12_mon"))$Definition, 
+                     xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+                     yaxis = list(title = "Frequency")
+             )
+p6 <- plot_ly(cleaned_data, x = ~Contacts_Count_12_mon, type = 'histogram', name = 'Contacts_Count_12_mon') %>%
+      plotly::layout(title = (data_dict %>% filter(Feature == "Contacts_Count_12_mon"))$Definition, 
+                     xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+                     yaxis = list(title = "Frequency")
+             )
+p7 <- plot_ly(cleaned_data, x = ~Credit_Limit, type = 'histogram', name = 'Credit_Limit') %>%
+      plotly::layout(title = (data_dict %>% filter(Feature == "Credit_Limit"))$Definition, 
+                     xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+                     yaxis = list(title = "Frequency")
+             )
+
+final_plot <- subplot(p1, p2, p3, p4, p5, p6, p7,
+                      nrows = 3, 
+                      margin = 0.08) %>%
+      plotly::layout(title = "Dataset Distributions of Some Numerical Features",
+             showlegend = TRUE,
+             legend = list(x = 0.5, y = -0.1, orientation = 'h', xanchor = 'center', yanchor = 'top'))
+
+final_plot
+```
+
+We note that `Customer_Age`, `Dependent_Count`, `Total_Relationship_Count` and `Contacts_Count_12_mon` seem relatively well behaved (e.g, symmetric). 
+
+The distribution of `Credit_Limit` has some curious features - there is clearly very large proportion of customers with small credit limits. There is also an extreme right skew, and a curious spike at the maximum of the range. This is an excellent example of a situation in which binning is called for. For these reasons, we will bin `Credit_Limit`, to create a new ordinal feature with 7 levels. 
+
+Furthermore, `Months_on_book` has a single strange spike near the middle of the range.
+
+```{r months_on_book_freq,  echo=FALSE, warnings=FALSE, messages=FALSE}
+cleaned_data %>% 
+  group_by(Months_on_book) %>% # group by feature
+  summarize(Count = n()) %>% # summarize by counting
+  filter(Count == max(Count)) # pull the row in the summary tibble where the value is maximum
+```
+
+This represents $\approx 25%$ of the dataset, which is very unusual. Since this is too large a percentage to drop, we will choose to bin this feature. We will also bin `Months_Inactive_12_mon` to lump the values with small proportions together.
+
+Now we plot the dataset distributions of the remaining eight numerical features
+
+```{r num_feat_dist_plots2, echo=FALSE, warnings=FALSE, messages=FALSE}
+p8 <- plot_ly(cleaned_data, x = ~Total_Revolving_Bal, type = 'histogram', name = 'Total_Revolving_Bal') %>%
+      plotly::layout(title = (data_dict %>% filter(Feature == "Total_Revolving_Bal"))$Definition, 
+                     xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+                     yaxis = list(title = "Frequency")
+             )
+p9 <- plot_ly(cleaned_data, x = ~Avg_Open_To_Buy, type = 'histogram', name = 'Avg_Open_To_Buy') %>%
+      plotly::layout(title = (data_dict %>% filter(Feature == "Avg_Open_To_Buy"))$Definition, 
+                     xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+                     yaxis = list(title = "Frequency")
+             )
+p10 <- plot_ly(cleaned_data, x = ~Total_Amt_Chng_Q4_Q1, type = 'histogram', name = 'Total_Amt_Chng_Q4_Q1') %>%
+      plotly::layout(title = (data_dict %>% filter(Feature == "Total_Amt_Chng_Q4_Q1"))$Definition, 
+                     xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+                     yaxis = list(title = "Frequency")
+             )
+p11 <- plot_ly(cleaned_data, x = ~Total_Trans_Amt, type = 'histogram', name = 'Total_Trans_Amt') %>%
+      plotly::layout(title = (data_dict %>% filter(Feature == "Total_Trans_Amt"))$Definition, 
+                     xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+                     yaxis = list(title = "Frequency")
+             )
+p12 <- plot_ly(cleaned_data, x = ~Total_Trans_Ct, type = 'histogram', name = 'Total_Trans_Ct') %>%
+      plotly::layout(title = (data_dict %>% filter(Feature == "Total_Trans_Ct"))$Definition, 
+                     xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+                     yaxis = list(title = "Frequency")
+             )
+p13 <- plot_ly(cleaned_data, x = ~Total_Ct_Chng_Q4_Q1, type = 'histogram', name = 'Total_Ct_Chng_Q4_Q1') %>%
+      plotly::layout(title = (data_dict %>% filter(Feature == "Total_Ct_Chng_Q4_Q1"))$Definition, 
+                     xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+                     yaxis = list(title = "Frequency")
+             )
+p14 <- plot_ly(cleaned_data, x = ~Avg_Utilization_Ratio, type = 'histogram', name = 'Avg_Utilization_Ratio') %>%
+      plotly::layout(title = (data_dict %>% filter(Feature == "Avg_Utilization_Ratio"))$Definition, 
+                     xaxis = list(title = "Values", tickangle = 15, margin = list(b = 100)),
+                     yaxis = list(title = "Frequency")
+             )
+
+final_plot <- subplot(p8, p9, p10, p11, p12, p13, p14,
+                      nrows = 3, 
+                      margin = 0.08) %>%
+      plotly::layout(title = "Dataset Distributions of Remaining Numerical Features",
+             showlegend = TRUE,
+             legend = list(x = 0.5, y = -0.1, orientation = 'h', xanchor = 'center', yanchor = 'top'))
+
+final_plot
+
+```
+
+We note that `Total_Revolving_Bal` and `Avg_Utilization_Ratio` have a large spike around 0 and an extreme right skew. We will bin these as ordinal features with a low number of levels, with an extra lowest level for the zero value.
+
+`Avg_Open_To_Buy` has a similar distribution compared to `Credit_Limit` with a high right skew and a spike at the lowest part of the range. `Total_Amt_Chng_Q4_Q1` and `Total_Ct_Chng_Q4_Q1` also both show extreme right skew. We will transform these features to try to reduce skew.
+
+Finally, `Total_Trans_Amt` and `Total_Trans_Ct` are clearly multimodal distributions. For this reason, we will bin these features as well.
+
+Here is a summary of numerical features which need further engineering:
+
+1. Transformations: `Credit_Limit`, `Avg_Open_To_Buy`, `Total_Amt_Chng_Q4_Q1`, `Total_Ct_Chng_Q4_Q1`
+2. Binning: `Card_Category`, `Months_on_book`,  `Months_Inactive_12_mon`, `Total_Revolving_Bal`, `Avg_Open_To_Buy`, `Avg_Utilization_Ratio`, `Total_Trans_Amt`, `Total_Trans_Ct`
+
+
+#### [APPENDIX OPTIONAL] Feature Engineering
+
+ Here the intention is to create features which are both meaningfully meaningfully interpretable and have additional predictive value. The exploratory analysis, in particular the distribution plots, as well as domain knowledge, informed the decision to create the following new features from pre-existing ones:
+ 
+- `Avg_Trans = Total_Trans_Amt / Total_Trans_Ct` - Average amount of customer spending per transaction.
+- `Avg_Mon_Spend = Total_Trans_Amt / Months_on_book` - Average monthly spending of the customer over the duration of their recorded relationship with the bank.
+- `Trans_Freq = Total_Trans_Ct / Months_on_book` - Average number of transactions per month of the recorded customer duration.
+- `Credit_Use_Ratio = Total_Revolving_Bal / Credit_Limit` - Proportion of available credit utilized, a well known indicator of customer credit health.
+
+Further exploratory analysis in the preliminary steps showed that these features all had sufficient predictive value to justify including them in the predictive modeling.
+
+##### Create New Features
+
+In this section, we create the new features. First we check for zero values, that could be a problem for division.
+
+```{r create_new_feat, echo=FALSE, warnings=FALSE, messages=FALSE}
+num_cust_before <- dim(cleaned_data)[1]
+
+# ensure no values are zero before dividing
+cleaned_data <- cleaned_data %>%
+  filter(Total_Trans_Ct != 0,
+         Months_on_book != 0, 
+         Credit_Limit != 0)
+
+num_cust_after <- dim(cleaned_data)[1]
+
+cat(num_cust_after - num_cust_before, "customers were removed before filtering for zero values", "\n\n")
+```
+
+And here is a snapshot of the features.
+
+```{r}
+# create tibble for modeling
+model_data <- cleaned_data
+
+# average transaction
+model_data$Avg_Trans <- model_data$Total_Trans_Amt / model_data$Total_Trans_Ct
+
+# average monthly spending
+model_data$Avg_Mon_Spend <- model_data$Total_Trans_Amt / model_data$Months_on_book
+
+# average monthly transactions
+model_data$Trans_Freq <- model_data$Total_Trans_Ct / model_data$Months_on_book
+
+# average credit utilization ratio
+model_data$Credit_Use_Ratio <- model_data$Total_Revolving_Bal / model_data$Credit_Limit
+
+# get engineered columns
+eng_feat <- model_data %>%
+  select(Avg_Trans, Avg_Mon_Spend, Trans_Freq, Credit_Use_Ratio)
+
+head(eng_feat)
+```
+
+And finally, some basic summary statistics on the new customer features
+
+```{r summary_eng_feat, echo=FALSE, warnings=FALSE, messages=FALSE}
+summary(eng_feat)
+```
+
+
+##### Visualize New Feature Distributions
+
+Now we look at the dataset distributions of features we just engineered, with the same intentions as above when we visualized the preexisting categorical and numerical dataset Distributions.
+
+```{r eng_feat_hist_plots, echo=FALSE, warnings=FALSE, messages=FALSE}
+p1 <- plot_ly(eng_feat, 
+              x = ~Avg_Trans, 
+              type = 'histogram', 
+              name = 'Avg_Trans') %>%
+  plotly::layout(title = ' Average Customer Transaction Amount',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+p2 <- plot_ly(eng_feat, 
+              x = ~Avg_Mon_Spend, 
+              type = 'histogram', 
+              name = 'Avg_Mon_Spend') %>%
+  plotly::layout(title = 'onthly Average Customer Transaction Amount',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+p3 <- plot_ly(eng_feat, 
+              x = ~Trans_Freq, 
+              type = 'histogram', 
+              name = 'Trans_Freq') %>%
+  plotly::layout(title = ' Monthly Average Number of Customer Transactions',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+p4 <- plot_ly(eng_feat, 
+              x = ~Credit_Use_Ratio, 
+              type = 'histogram', 
+              name = 'Credit_Use_Ratio') %>%
+  plotly::layout(title = ' Customer Credit Utilization Ratio',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+final_plot <- subplot(p1, p2, p3, p4, 
+                      nrows = 2, 
+                      margin = 0.05) %>%
+      plotly::layout(title = 'Dataset Distributions of Engineered Features: Before Transformation and Binning',
+             showlegend = TRUE,
+             legend = list(x = 0.5, y = -0.1, orientation = 'h', xanchor = 'center', yanchor = 'top'))
+
+final_plot
+```
+
+Each of these distributions are highly right skewed, suggesting a somewhat exponential distribution. It can be helpful to reduce skew as a precautionary step, since some models are better able to handle skew than others (for example in the latter case, if it is assumed the data is normally distributed).These distributions are not surprising, given the properties of the distributions of the features they were derived from.
+
+We will bin `Credit_Utilization_Ratio` and transform the remaining new features. We note a large spike in the distribution at `Credit_Utilization_Ratio == 0`, indicating a large number of customers are retaining a zero balance.
+
+
+##### Binning
+
+In this section, we bin the following features: `Card_Category`, `Months_on_book`,  `Months_Inactive_12_mon`, `Total_Revolving_Bal`, `Avg_Utilization_Ratio`, `Total_Trans_Amt`, `Total_Trans_Ct`, `Credit_Use_Ratio`. The choice of bins are made by hand in this case, although there are a wide range of options for doing so, including more advanced techniques.
+
+Note that this binning will result in an ordinal (not categorical) feature because of the natural ordering reflecting the ordering of the underlying continuous feature. 
+
+Also note that the resulting numerical feature encoding will not necessarily be easily interpreted - for example, we will encode `Months_on_book >= 4` as `Months_on_book = 4`, so that any value $\geqslant$ 4 months before the encoding will have code 4 afterwards (in that case, essentially, we are re-binning the upper end of the range).
+
+Here is a summary of the re-encoding:
+
+1. Card category will be re-grouped into two categories, 1 corresponding to Blue card category, 2 corresponding to all other card types.
+2. Months on book will be binned into 6 bins, roughly corresponding to the number of years of book, with an additional category for `Months_on_book == 36`, since this represents roughly 25% of customers.
+3. Months Inactive in the last twelve will binned into 4 bins, corresponding to 0 and 1, 2, 3, and more than 4 months.
+4. Total Revolving Balances will be binned into six bins, corresponding to 0-500, 500-1000, 1000-1500, 1500-2000, and > 2000
+5. Credit utilization ratio and average utilization will be binned into 6 bins of equal width 0-0.2, 0.2-0.4, 0.4-0.6, 0.6-0.8, and 0.8-1.0.
+6. Total transaction amount will be binned into 5 bins, 0, >0 - 3000, 3000-5000, 5000-10000, and > 10000
+7. Total transaction count will be binned into 3 bins, 0-50, 5-80, and > 80.
+
+
+```{r do_tranfs_and_bins, include=FALSE}
+bin_feat <- c('Card_Category', 'Months_on_book',  'Months_Inactive_12_mon', 'Total_Revolving_Bal', 'Avg_Utilization_Ratio', 'Total_Trans_Amt', 'Total_Trans_Ct', 'Credit_Use_Ratio')
+model_data <- model_data %>% 
+  mutate(Card_Category = case_when(
+         Card_Category == "Blue" ~ "Blue",
+         TRUE ~ "Silver, Gold, Platinum"
+         ),
+         Months_on_book = case_when( # bins roughly correspond to years
+         Months_on_book >= min(Months_on_book) & Months_on_book < 12 ~ 1, # use lower ends of intervals
+         Months_on_book >= 12 & Months_on_book < 24 ~ 2,
+         Months_on_book >= 24 & Months_on_book < 36 ~ 3,
+         Months_on_book == 36 ~ 4, # special bin for huge number of customers with 36 months on book
+         Months_on_book >= 37 & Months_on_book < 48 ~ 5,
+         Months_on_book >= 48 & Months_on_book <= max(Months_on_book) ~ 6 # max is 6
+         ),
+         Months_Inactive_12_mon = case_when(
+         Months_Inactive_12_mon <= 1 ~ 1, # min is 0
+         Months_Inactive_12_mon >= 4 ~ 4, # maximum is 6
+         TRUE ~ Months_Inactive_12_mon
+         ),
+         Total_Revolving_Bal = case_when(
+         Total_Revolving_Bal == min(Total_Revolving_Bal) ~ 1, # min == 0 in this case, very large number of observations
+         Total_Revolving_Bal > min(Total_Revolving_Bal) & Total_Revolving_Bal <= 500 ~ 2, # upper interval ends
+         Total_Revolving_Bal > 500 & Total_Revolving_Bal <= 1000 ~ 3,
+         Total_Revolving_Bal > 1000 & Total_Revolving_Bal <= 1500 ~ 4,
+         Total_Revolving_Bal > 1500 & Total_Revolving_Bal <= 2000 ~ 5,
+         Total_Revolving_Bal > 2000 & Total_Revolving_Bal <= max(Total_Revolving_Bal) ~ 6 # max is 2517
+         ),
+         Avg_Utilization_Ratio = case_when(
+         Avg_Utilization_Ratio == min(Avg_Utilization_Ratio) ~ 1, # min == 0, very large number of observations
+         Avg_Utilization_Ratio > min(Avg_Utilization_Ratio) & Avg_Utilization_Ratio <= 0.2 ~ 2, # upper interval ends 
+         Avg_Utilization_Ratio > 0.2 & Avg_Utilization_Ratio <= 0.4 ~ 3,
+         Avg_Utilization_Ratio > 0.4 & Avg_Utilization_Ratio <= 0.6 ~ 4,
+         Avg_Utilization_Ratio > 0.6 & Avg_Utilization_Ratio <= 0.8 ~ 5,
+         Avg_Utilization_Ratio > 0.8 & Avg_Utilization_Ratio <= max(Avg_Utilization_Ratio) ~ 6 # max is approx 0.998
+         ),
+         Total_Trans_Amt = case_when( # try to capture 4 modes in bins
+         Total_Trans_Amt >= min(Total_Trans_Amt) & Total_Trans_Amt <= 3000 ~ 1, # upper interval ends
+         Total_Trans_Amt > 3000 & Total_Trans_Amt <= 5000 ~ 2,
+         Total_Trans_Amt > 5000 & Total_Trans_Amt <= 10000 ~ 3,
+         Total_Trans_Amt > 10000 & Total_Trans_Amt <= max(Total_Trans_Amt) ~ 4 # max is 18484
+         ),
+         Total_Trans_Ct = case_when( # try to capture 3 modes in bins
+         Total_Trans_Ct >= min(Total_Trans_Ct) & Total_Trans_Ct <= 50 ~ 1, # upper interval ends
+         Total_Trans_Ct > 50 & Total_Trans_Ct <= 80 ~ 2,
+         Total_Trans_Ct > 80 & Total_Trans_Ct <= max(Total_Trans_Ct) ~ 3 # max is 139
+         ),
+         Credit_Use_Ratio = case_when(
+         Credit_Use_Ratio == min(Credit_Use_Ratio) ~ 1, # min is zero in this case, very large number of observations
+         Credit_Use_Ratio > min(Credit_Use_Ratio) & Credit_Use_Ratio <= 0.2 ~ 2, # use upper ends of intervals
+         Credit_Use_Ratio > 0.2 & Credit_Use_Ratio <= 0.4 ~ 3,
+         Credit_Use_Ratio > 0.4 & Credit_Use_Ratio <= 0.6 ~ 4,
+         Credit_Use_Ratio > 0.6 & Credit_Use_Ratio <= 0.8 ~ 5,
+         Credit_Use_Ratio > 0.8 & Credit_Use_Ratio <= max(Credit_Use_Ratio) ~ 6 # max is approx 0.998
+         ),
+         
+  )
+```
+
+Let us inspect the distributions of the binned features after binning.
+
+```{r transf_bin_eng_feat_hist_plots, echo=FALSE, warnings=FALSE, messages=FALSE}
+safe_get_name <- function(feature) {
+  def <- data_dict %>% filter(Feature == feature) %>% pull(Definition)
+  if (length(def) == 0) "Undefined" else def
+}
+
+p1 <- plot_ly(model_data, 
+              x = ~Card_Category, 
+              type = 'histogram', 
+              name = safe_get_name('Card_Category')) %>%
+  plotly::layout(title = 'Customer Card Category Post-Binning',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+p2 <- plot_ly(model_data, 
+              x = ~Months_on_book, 
+              type = 'histogram', 
+              name = safe_get_name('Months_on_book')) %>%
+  plotly::layout(title = 'Customer Months on Book Post-Binning',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+p3 <- plot_ly(model_data, 
+              x = ~Months_Inactive_12_mon, 
+              type = 'histogram', 
+              name = safe_get_name('Months_Inactive_12_mon')) %>%
+  plotly::layout(title = 'Customer Card Months Inactive in Past 12 Post-Binning',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+p4 <- plot_ly(model_data, 
+              x = ~Total_Revolving_Bal, 
+              type = 'histogram', 
+              name = safe_get_name('Total_Revolving_Bal')) %>%
+  plotly::layout(title = 'Customer Total Revolving Balance Post-Binning',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+p5 <- plot_ly(model_data, 
+              x = ~Avg_Utilization_Ratio, 
+              type = 'histogram', 
+              name = safe_get_name('Avg_Utilization_Ratio')) %>%
+  plotly::layout(title = 'Customer Card Average Utilization Ratio Post-Binning',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+p6 <- plot_ly(model_data, 
+              x = ~Total_Trans_Amt, 
+              type = 'histogram', 
+              name = safe_get_name('Total_Trans_Amt')) %>%
+  plotly::layout(title = 'Customer Total Transaction Amount Post-Binning',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+p7 <- plot_ly(model_data, 
+              x = ~Total_Trans_Ct, 
+              type = 'histogram', 
+              name = safe_get_name('Total_Trans_Ct')) %>%
+  plotly::layout(title = 'Customer Card Total Transaction Count Post-Binning',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+p8 <- plot_ly(model_data, 
+              x = ~Credit_Use_Ratio, 
+              type = 'histogram', 
+              name = safe_get_name('Credit_Use_Ratio')) %>%
+  plotly::layout(title = 'Customer Card Credit Use Ratio Post-Binning',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+
+
+final_plot <- subplot(p1, p2, p3, p4, p5, p6, p7, p8,
+                      nrows = 4, 
+                      margin = 0.05) %>%
+      plotly::layout(title = 'Dataset Distributions Some Customer Features After Binning',
+             showlegend = TRUE,
+             legend = list(x = 0.5, y = -0.1, orientation = 'h', xanchor = 'center', yanchor = 'top'))
+
+final_plot
+```
+
+These distributions look much more appropriate for predictive modeling, with the exception of `Card_Category` which is still extremely unbalanced after the binning. To decide if retaining a feature with this large of an imbalance is useful, let us consider its relationship to the predictive target
+
+
+```{r joint_dist_attr_cardcat_plot, echo=FALSE, warnings=FALSE, messages=FALSE}
+# summarize the data by grouping to get the counts
+data_summary <- model_data %>%
+  group_by(Attrition_Flag, Card_Category) %>%
+  summarise(Count = n(), .groups = 'drop') %>%
+  mutate(Proportion=round(Count/sum(Count), 2))
+
+# create the plotly plot
+p <- plot_ly(data = data_summary, x = ~Attrition_Flag, y = ~Proportion, type = 'bar', color = ~Card_Category) %>%
+  plotly::layout(yaxis = list(title = 'Proportion'),
+                 title = 'Joint Dataset Distribution of Customer Attrition and Card Category',
+                 barmode = 'stack')
+
+p
+```
+
+This is a tough call, but given that there are only 100 customers which churned which also have non-blue card category, there
+is a strong case that the relationship with the predictive target is too weak to justify including it. However, we note that overall, the ratio of features to observations is << 1. 
+
+```{r var_obs_ratio, echo=FALSE, warnings=FALSE, messages=FALSE}
+var_obs_ratio = round(dim(model_data)[2]/dim(model_data)[1], 3)
+cat("Ratio of features to observations is", var_obs_ratio)
+```
+
+Furthermore, advanced modern models such as `xgboost` may be able to make use of the slight amount of information this feature provides, so we choose to keep it for modeling.
+
+
+##### Transformations
+
+Here we apply the logarithm transformation to the following features: `Credit_Limit`, `Avg_Open_To_Buy`, `Total_Amt_Chng_Q4_Q1`, `Total_Ct_Chng_Q4_Q1`, `Avg_Trans`, `Avg_Mon_Spend`, `Trans_Freq`.
+
+This transformation is intended reduce skew (note that the logarithm is the inverse of the exponential transformation). Note we cannot straightforwardly apply this transformation to any zero values of these features. To get around this issue, we can drop these rows, or perform a not uncommon step of imputing a tiny but negligible non zero value. Since these customers may be customers which churned and there are so few of these in the dataset, we take the latter approach.
+
+```{r do_feat_transf, echo=FALSE, warnings=FALSE, messages=FALSE}
+tiny_val <- 1e-6
+transform_cols <- c('Credit_Limit', 'Avg_Open_To_Buy', 'Total_Amt_Chng_Q4_Q1', 'Total_Ct_Chng_Q4_Q1', 
+                 'Avg_Trans', 'Avg_Mon_Spend', 'Trans_Freq')
+model_data <- model_data %>%
+  mutate(Credit_Limit = log(case_when(
+    Credit_Limit == 0 ~ tiny_val,
+    TRUE ~ Credit_Limit)),
+    Avg_Open_To_Buy = log(case_when(
+    Avg_Open_To_Buy == 0 ~ tiny_val,
+    TRUE ~ Avg_Open_To_Buy)),
+    Total_Amt_Chng_Q4_Q1 = log(case_when(
+    Total_Amt_Chng_Q4_Q1 == 0 ~ tiny_val,
+    TRUE ~ Total_Amt_Chng_Q4_Q1)),
+    Total_Ct_Chng_Q4_Q1 = log(case_when(
+    Total_Ct_Chng_Q4_Q1 == 0 ~ tiny_val,
+    TRUE ~ Total_Ct_Chng_Q4_Q1)),
+    Avg_Trans = log(case_when(
+    Avg_Trans == 0 ~ tiny_val,
+    TRUE ~ Avg_Trans)),
+    Avg_Mon_Spend = log(case_when(
+    Avg_Mon_Spend == 0 ~ tiny_val,
+    TRUE ~ Avg_Mon_Spend)),
+    Trans_Freq = log(case_when(
+    Trans_Freq == 0 ~ tiny_val,
+    TRUE ~ Trans_Freq))
+  )
+```
+
+
+```{r trans_bin_eng_feat_hist_plots, echo=FALSE, warnings=FALSE, messages=FALSE}
+
+p1 <- plot_ly(model_data, 
+              x = ~Credit_Limit, 
+              type = 'histogram', 
+              name = safe_get_name('Credit_Limit')) %>%
+  plotly::layout(title = 'Customer Credit Limit Post-Transformation',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+p2 <- plot_ly(model_data, 
+              x = ~Avg_Open_To_Buy, 
+              type = 'histogram', 
+              name = safe_get_name('Avg_Open_To_Buy')) %>%
+  plotly::layout(title = 'Customer 12 Month Average Open to Buy Post-Transformation',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+p3 <- plot_ly(model_data, 
+              x = ~Total_Amt_Chng_Q4_Q1, 
+              type = 'histogram', 
+              name = safe_get_name('Total_Amt_Chng_Q4_Q1')) %>%
+  plotly::layout(title = 'Customer Card Total Card Amount Change Q1 to Q4 Post-Transformation',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+p4 <- plot_ly(model_data, 
+              x = ~Total_Ct_Chng_Q4_Q1, 
+              type = 'histogram', 
+              name = safe_get_name('Total_Revolving_Bal')) %>%
+  plotly::layout(title = 'Customer Card Total Transactions Change Q1 to Q4 Post-Transformation',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+p5 <- plot_ly(model_data, 
+              x = ~Avg_Trans, 
+              type = 'histogram', 
+              name = safe_get_name('Avg_Trans')) %>%
+  plotly::layout(title = 'Customer Card Average Number of Transactions Post-Transformation',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+p6 <- plot_ly(model_data, 
+              x = ~Avg_Mon_Spend, 
+              type = 'histogram', 
+              name = safe_get_name('Avg_Mon_Spend')) %>%
+  plotly::layout(title = 'Customer Average Monthly Transaction Amount Post-Transformation',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+p7 <- plot_ly(model_data, 
+              x = ~Trans_Freq, 
+              type = 'histogram', 
+              name = safe_get_name('Trans_Freq')) %>%
+  plotly::layout(title = 'Customer Card Monthly Average Number of Transactions Post-Transformation',
+             xaxis = list(title = 'Values'),
+             yaxis = list(title = 'Frequency')
+             )
+
+final_plot <- subplot(p1, p2, p3, p4, p5, p6, p7,
+                      nrows = 4, 
+                      margin = 0.05) %>%
+      plotly::layout(title = 'Dataset Distributions Some Customer Features After Binning',
+             showlegend = TRUE,
+             legend = list(x = 0.5, y = -0.1, orientation = 'h', xanchor = 'center', yanchor = 'top'))
+
+final_plot
+```
+
+
+Again, these distributions look much more suitable for predictive modeling. In particular, they are closer to normally distributed.
+
+
+
+#### Predictive Modeling
+
+In this section we model the relationship between the customer features (preexisting and engineered) and customer attrition, with an eye towards maximizing predictive accuracy.
+
+We perform the final preprocessing steps, then split the data into train and test (holdout) data. Using the training data, we fit and tune five baseline classifier predictive models based on well-known machine learning classification algorithms. We then evaluate these using standard metrics, and comparison with a null ("worst-case") model, thereby selecting a top choice. 
+
+##### Preprocessing
+
+First we perform the final preprocessing steps necessary to get the data in a final form suitable for fitting machine learning algorithms.
+
+###### Train Test Split
+
+A fairly common 75%-25% train-test split is performed. The training data will be used to tune the baseline predictive models a process called cross-validation, which provides a more accurate estimate of the model on unseen data, while the test data will be held out until the last step, to provide a final estimate of future model predictive accuracy. 
+
+```{r train_test_split, echo=FALSE, warnings=FALSE, messages=FALSE}
+# Perform train test split
+data_split <- initial_split(model_data, strata = "Attrition_Flag", prop = 0.75)
+train_set <- training(data_split)
+test_set  <- testing(data_split)
+
+# inspect dimension of split sets
+cat("Train set dimensions:", dim(train_set), "\n")
+cat("Test set dimensions:", dim(test_set))
+```
+
+###### Preprocessing Recipe
+
+We next perform the following preprocessing steps
+
+1. `step_other` - this pools infrequently occurring values of categorical features into another category called `"other"`
+2. `step_dummy` - this one-hot encodes all categorical features. 
+3. `step_center` - this centers all features (which are all numeric by this stage in the processing pipeline) by subtracting them from their mean.
+4. `step_scale` - this scales all features by dividing them by their standard deviation.
+
+```{r create_recipe, echo=FALSE, warnings=FALSE, messages=FALSE}
+# create preprocessing recipe
+rec <- recipe(Attrition_Flag ~ ., data = train_set) %>%
+  step_other(Education_Level, Marital_Status, Income_Category, Card_Category) %>% 
+  step_dummy(all_nominal_predictors()) %>%
+  step_center(all_predictors()) %>%
+  step_scale(all_predictors())
+```
+
+##### Hyperparameter Tuning with Cross-Validation on Train Data
+
+In this section we tune the hyperparameters of the 5 baseline classification algorithms: logistic regression, k-nearest neighbors, naive Bayes, random forest, and gradient boosted machines (specifically, XGBoost).
+
+We use 5-fold cross-validation to tune the model to the training data, to find the best hyperparameters for each model. Optimization is with respect to the area under the receiver operating characteristic curve (ROC-AUC), a good metric for a balanced classifier with a binary target. 
+
+To save training and computational resource time, we only tune a single hyperparameter for each model. We also use 5 CV folds, rather than 10 as in the preliminary steps. In both cases, experimentation revealed little additional benefit to exploring more hyperparameters or using a greater number of folds.
+
+```{r create_models, echo=FALSE, warnings=FALSE, messages=FALSE}
+# create models
+
+lr_mod <- # logistic regression
+  logistic_reg(penalty = tune(), mixture = 1) %>% 
+  set_engine("glmnet")
+
+knn_mod <- # k-nearest neighbors
+  nearest_neighbor(neighbors = tune()) %>% 
+  set_mode("classification") %>%
+  set_engine("kknn")
+
+nb_mod <- # naive bayes model
+  naive_Bayes(smoothness = tune()) %>%
+  set_mode("classification") %>%
+  set_engine("klaR")
+
+rf_mod <- # random forest
+  rand_forest(mtry = tune()) %>% 
+  set_engine("ranger") %>%
+  set_mode("classification")
+
+xgb_mod <- # xgboost classifier
+  boost_tree(trees = tune()) %>%
+  set_engine("xgboost") %>%
+  set_mode("classification")
+
+```
+
+
+```{r create_workflows, echo=FALSE, warnings=FALSE, messages=FALSE}
+# create workflows
+lr_workflow <- 
+  workflow() %>% 
+  add_recipe(rec) %>%
+  add_model(lr_mod)
+
+knn_workflow <- 
+  workflow() %>% 
+  add_recipe(rec) %>%
+  add_model(knn_mod)
+
+nb_workflow <- 
+  workflow() %>% 
+  add_recipe(rec) %>%
+  add_model(nb_mod)
+
+rf_workflow <- 
+  workflow() %>% 
+  add_recipe(rec) %>%
+  add_model(rf_mod)
+
+xgb_workflow <- 
+  workflow() %>% 
+  add_recipe(rec) %>%
+  add_model(xgb_mod)
+```
+
+
+```{r create_hyp_grids, echo=FALSE, warnings=FALSE, messages=FALSE}
+# hyperparameter grids
+
+# logistic regression grid
+lr_grid <- tibble(penalty = 10^seq(-4, -1, length.out = 30))
+
+# k-nearest neighbors
+knn_grid <- grid_regular(
+  neighbors(c(1, 20)),
+  levels = 10
+)
+
+nb_grid <- tibble(smoothness = 10^seq(-4, -1, length.out = 10)) # fewer values than log reg since it takes a LONG time to train
+
+rf_grid <- grid_regular(
+  mtry(range = c(3, 10)),      
+  levels = 8
+)
+
+xgb_grid <- grid_regular(
+  trees(c(100, 1000)),               # Number of boosting trees
+  levels = 10         
+)
+
+```
+
+Now, we tune the models
+
+```{r set_up_tuning, echo=FALSE, warnings=FALSE, messages=FALSE}
+
+# split the training set into 10 cv folds
+cv_set <- vfold_cv(train_set, strata = "Attrition_Flag", v = 5)
+
+# helper function for tuning and timing it
+
+tune_model <- function(model_workflow, model_grid, model_name){
+  # get current system time
+  start_time <- Sys.time()
+  
+  model_results <-
+    model_workflow %>% 
+    tune_grid(cv_set,
+              grid = model_grid,
+              control = control_grid(save_pred = TRUE),
+              metrics = metric_set(roc_auc)
+              )
+  
+  # get current system time again
+  end_time <- Sys.time()
+    
+  cat(model_name, "elasped tuning time approximately:", end_time - start_time, "seconds")
+  
+  return(model_results)
+}
+
+```
+
+
+```{r}
+# Prepare and bake the recipe
+baked_data <- rec %>%
+  prep(training = train_set) %>%
+  bake(new_data = NULL)
+
+# Check for missing values in the baked data
+na_counts <- baked_data %>%
+  summarise(across(everything(), ~sum(is.na(.), na.rm = FALSE)))
+
+na_counts
+```
+
+```{r tune_lr, echo=FALSE, warnings=FALSE, messages=FALSE}
+lr_results <- tune_model(lr_workflow, lr_grid, "Logistic Regression")
+```
+
+```{r tune_knn, echo=FALSE, warnings=FALSE, messages=FALSE}
+knn_results <- tune_model(knn_workflow, knn_grid, "K-Nearest Neighbors")
+```
+
+```{r tune_nb, echo=FALSE, warnings=FALSE, messages=FALSE}
+nb_results <- tune_model(nb_workflow, nb_grid, "Naive Bayes")
+```
+
+```{r tune_rf, echo=FALSE, warnings=FALSE, messages=FALSE}
+rf_results <- tune_model(rf_workflow, rf_grid, "Random Forest")
+```
+
+```{r tune_xgb, echo=FALSE, warnings=FALSE, messages=FALSE}
+xgb_results <- tune_model(xgb_workflow, xgb_grid, "XGBoost")
+```
+
+We note some numerical issues with naive Bayes, already indicating that perhaps this model is not a good choice for the dataset.
+
+## Detailed Findings and Evaluation
+
+Here we provide an in-depth evaluation of models and description of analytical findings.
+
+### Evaluate Tuned Models
+
+In this section, we look at the 5-fold CV estimates of the ROC-AUC for each classifier, highlighting the top 5 models (corresponding to the hyperparameter values searched in the CV tuning). 
+
+We then fit five models using the best hyperparameters obtained in the CV tuning step, obtain their predictions on the test data, and investigate them more deeply, plotting ROC and Calibration curves and calculating accuracy with respect to the model predictions.
+
+Finally, we use these results to select a top model.
+
+#### Tuning Results and CV ROC-AUC Estimates
+
+Here are plots of the hyperparameter values for each of the five baseline classification models, versus the mean ROC-AUC score over all 5 cross-validation folds.
+
+```{r lr_tune_plot, echo=FALSE, warnings=FALSE, messages=FALSE}
+# create separate plots for both models
+lr_plot <- 
+  lr_results %>% 
+  collect_metrics() %>% 
+  ggplot(aes(x = penalty, y = mean)) + 
+  geom_point() + 
+  geom_line() + 
+  scale_x_log10(labels = scales::label_number()) +
+  labs(
+    title = "Hyperparameter Tuning Results (Logistic Regression)",
+    subtitle = "",
+    caption = "",
+    x = "5-Fold Cross-Validation (Mean) ROC AUC",
+    y = "Regularization Penalty"
+  )
+
+lr_plot
+```
+
+```{r knn_tune_plot, echo=FALSE, warnings=FALSE, messages=FALSE}
+knn_plot <- 
+  knn_results %>% 
+  collect_metrics() %>% 
+  ggplot(aes(x = neighbors, y = mean)) + 
+  geom_point() + 
+  geom_line() + 
+  scale_x_log10(labels = scales::label_number()) +
+  labs(
+    title = "Hyperparameter Tuning Results (K-Nearest Neighbors)",
+    subtitle = "",
+    caption = "",
+    x = "5-Fold Cross-Validation (Mean) ROC AUC",
+    y = "K (Neighbors)"
+  )
+
+knn_plot
+```
+
+```{r nb_tune_plot, echo=FALSE, warnings=FALSE, messages=FALSE}
+nb_plot <- 
+  nb_results %>% 
+  collect_metrics() %>% 
+  ggplot(aes(x = smoothness, y = mean)) + 
+  geom_point() + 
+  geom_line() + 
+  scale_x_log10(labels = scales::label_number()) +
+  labs(
+    title = "Hyperparameter Tuning Results (Naive Bayes)",
+    subtitle = "",
+    caption = "",
+    x = "5-Fold Cross-Validation (Mean) ROC AUC",
+    y = "Smoothness"
+  )
+
+nb_plot
+```
+
+```{r rf_tune_plot, echo=FALSE, warnings=FALSE, messages=FALSE}
+rf_plot <- 
+  rf_results %>% 
+  collect_metrics() %>% 
+  ggplot(aes(x = mtry, y = mean)) + 
+  geom_point() + 
+  geom_line() + 
+  scale_x_log10(labels = scales::label_number()) +
+  labs(
+    title = "Hyperparameter Tuning Results (Random Forest)",
+    subtitle = "",
+    caption = "",
+    x = "5-Fold Cross-Validation (Mean) ROC AUC",
+    y = "Number of Features per Split (Mtry)"
+  )
+
+rf_plot
+```
+
+```{r xgb_tune_plot, echo=FALSE, warnings=FALSE, messages=FALSE}
+xgb_plot <- 
+  xgb_results %>% 
+  collect_metrics() %>% 
+  ggplot(aes(x = trees, y = mean)) + 
+  geom_point() + 
+  geom_line() + 
+  scale_x_log10(labels = scales::label_number()) +
+  labs(
+    title = "Hyperparameter Tuning Results (XGBoost)",
+    subtitle = "",
+    caption = "",
+    x = "5-Fold Cross-Validation (Mean) ROC AUC",
+    y = "Number of Trees (Trees)"
+  )
+
+xgb_plot
+```
+
+Here we summarize the cross-validation tuning results, selecting the top five hyperparameters for each model, ranked by mean CV ROC-AUC, and sorting overall mean CV ROC-AUC in descending order.
+
+```{r top_model_results, echo=FALSE, warnings=FALSE, messages=FALSE}
+# create tibble of results for top 5 models
+
+top_lr_models <-
+  lr_results %>% 
+  show_best(metric = "roc_auc", n = 5) %>% 
+  rename(Mean_CV_ROC_AUC=mean, Std_Err_CV_ROC_AUC=std_err, Hyperparameter_Value=penalty) %>%
+  mutate(Hyperparameter="Penalty", Model="Logistic Regression") %>%
+  select(Model, Hyperparameter, Hyperparameter_Value, Mean_CV_ROC_AUC, Std_Err_CV_ROC_AUC)
+
+top_knn_models <-
+  knn_results %>% 
+  show_best(metric = "roc_auc", n = 5) %>%
+  rename(Mean_CV_ROC_AUC=mean, Std_Err_CV_ROC_AUC=std_err, Hyperparameter_Value=neighbors) %>%
+  mutate(Hyperparameter="Neighbors", Model="K-Nearest Neighbors") %>%
+  select(Model, Hyperparameter, Hyperparameter_Value, Mean_CV_ROC_AUC, Std_Err_CV_ROC_AUC)
+
+top_nb_models <-
+  nb_results %>% 
+  show_best(metric = "roc_auc", n = 5) %>%
+  rename(Mean_CV_ROC_AUC=mean, Std_Err_CV_ROC_AUC=std_err, Hyperparameter_Value=smoothness) %>%
+  mutate(Hyperparameter="Smoothness", Model="Naive Bayes") %>%
+  select(Model, Hyperparameter, Hyperparameter_Value, Mean_CV_ROC_AUC, Std_Err_CV_ROC_AUC)
+
+top_rf_models <-
+  rf_results %>% 
+  show_best(metric = "roc_auc", n = 5) %>%
+  rename(Mean_CV_ROC_AUC=mean, Std_Err_CV_ROC_AUC=std_err, Hyperparameter_Value=mtry) %>%
+  mutate(Hyperparameter="NumPredictorsPerSplit", Model="Random Forest") %>%
+  select(Model, Hyperparameter, Hyperparameter_Value, Mean_CV_ROC_AUC, Std_Err_CV_ROC_AUC)
+
+top_xgb_models <-
+  xgb_results %>% 
+  show_best(metric = "roc_auc", n = 5) %>%
+  rename(Mean_CV_ROC_AUC=mean, Std_Err_CV_ROC_AUC=std_err, Hyperparameter_Value=trees) %>%
+  mutate(Hyperparameter="NumTrees", Model="XGBoost") %>%
+  select(Model, Hyperparameter, Hyperparameter_Value, Mean_CV_ROC_AUC, Std_Err_CV_ROC_AUC)
+
+top_models <- rbind(top_lr_models, top_knn_models, top_nb_models, top_rf_models, top_xgb_models) %>%
+  arrange(desc(Mean_CV_ROC_AUC))
+
+# print result tibble
+print(top_models)
+```
+
+From these results, there is a strong showing for the XGBoost gradient boosted machine model with all five top hyperparameter values having a better CV ROC-AUC then all other models, all just over 99%.
+
+Random forest is a close second, again with all all five top hyperparameter values having a better CV ROC-AUC then the remaining models, all just under 99%.
+
+Naive Bayes and logistic regression models took the next positions, with mixed ranking and accuracies between 92-94%. 
+
+Finally K-nearest neighbors fared worst, with all five hyperparameters ranked lower than all other models, with CV ROC-AUC around 88-89%.
+
+
+```{r get_best_hyperparams, echo=FALSE, warnings=FALSE, messages=FALSE}
+# get best hyperparameter values from tuning results
+best_lr_penalty <- top_models %>%
+  filter(Model == "Logistic Regression") %>%
+  filter(Mean_CV_ROC_AUC == max(Mean_CV_ROC_AUC)) %>%
+  select(Hyperparameter_Value)
+
+best_knn_neighbors <- top_models %>%
+  filter(Model == "K-Nearest Neighbors") %>%
+  filter(Mean_CV_ROC_AUC == max(Mean_CV_ROC_AUC)) %>%
+  select(Hyperparameter_Value)
+
+best_nb_smoothness <- top_models %>%
+  filter(Model == "Naive Bayes") %>%
+  filter(Mean_CV_ROC_AUC == max(Mean_CV_ROC_AUC)) %>%
+  select(Hyperparameter_Value)
+
+best_rf_mtry <- top_models %>%
+  filter(Model == "Random Forest") %>%
+  filter(Mean_CV_ROC_AUC == max(Mean_CV_ROC_AUC)) %>%
+  select(Hyperparameter_Value)
+
+best_xgb_trees <- top_models %>%
+  filter(Model == "XGBoost") %>%
+  filter(Mean_CV_ROC_AUC == max(Mean_CV_ROC_AUC)) %>%
+  select(Hyperparameter_Value)
+```
+
+
+```{r fit_best_models, echo=FALSE, warnings=FALSE, messages=FALSE}
+# create models using best hyperparameter values
+best_lr_mod <- 
+  logistic_reg(penalty = best_lr_penalty$Hyperparameter_Value[1], mixture = 1) %>% 
+  set_engine("glmnet")
+
+best_knn_mod <- 
+  nearest_neighbor(neighbors = best_knn_neighbors$Hyperparameter_Value[1]) %>% 
+  set_mode("classification") %>%
+  set_engine("kknn")
+
+best_nb_mod <- # naive bayes model
+  naive_Bayes(smoothness = best_nb_smoothness$Hyperparameter_Value[1]) %>%
+  set_mode("classification") %>%
+  set_engine("klaR")
+
+best_rf_mod <- # random forest
+  rand_forest(mtry = best_rf_mtry$Hyperparameter_Value[1]) %>% 
+  set_engine("ranger", importance='impurity') %>%
+  set_mode("classification")
+
+best_xgb_mod <- # xgboost classifier
+  boost_tree(trees = best_xgb_trees$Hyperparameter_Value[1]) %>%
+  set_engine("xgboost") %>%
+  set_mode("classification")
+
+# prepare training data in the recipe
+rec <- rec %>%
+  prep(training = train_set)
+
+# fit models
+best_lr_fit <- 
+  best_lr_mod %>%
+  fit(Attrition_Flag ~ ., data = bake(rec, new_data = train_set))
+
+best_knn_fit <- 
+  best_knn_mod %>%
+  fit(Attrition_Flag ~ ., data = bake(rec, new_data = train_set))
+
+best_nb_fit <-
+  best_nb_mod %>%
+  fit(Attrition_Flag ~ ., data = bake(rec, new_data = train_set))
+
+best_rf_fit <- 
+  best_rf_mod %>%
+  fit(Attrition_Flag ~ ., data = bake(rec, new_data = train_set))
+
+best_xgb_fit <- 
+  best_knn_mod %>%
+  fit(Attrition_Flag ~ ., data = bake(rec, new_data = train_set))
+```
+
+```{r collect_preds, echo=FALSE, warnings=FALSE, messages=FALSE}
+# bake testing data with the recipe
+test_baked <- bake(rec, new_data = test_set, all_predictors())
+
+# combine ground truth class labels with predicted probabilities
+lr_test_results <- 
+  test_set %>%
+  select(Attrition_Flag) %>%
+  bind_cols(
+    predict(best_lr_fit, new_data = test_baked, type = "prob")
+  ) 
+
+knn_test_results <- 
+  test_set %>%
+  select(Attrition_Flag) %>%
+  bind_cols(
+    predict(best_knn_fit, new_data = test_baked, type = "prob")
+  )
+
+nb_test_results <- 
+  test_set %>%
+  select(Attrition_Flag) %>%
+  bind_cols(
+    predict(best_nb_fit, new_data = test_baked, type = "prob")
+  )
+
+rf_test_results <- 
+  test_set %>%
+  select(Attrition_Flag) %>%
+  bind_cols(
+    predict(best_rf_fit, new_data = test_baked, type = "prob")
+  )
+
+# combine ground truth class labels with predicted probabilities for k-nearest neighbors
+xgb_test_results <- 
+  test_set %>%
+  select(Attrition_Flag) %>%
+  bind_cols(
+    predict(best_xgb_fit, new_data = test_baked, type = "prob")
+  )
+
+# get rid of problematic characters in column names
+colnames(lr_test_results) <- make.names(colnames(lr_test_results))
+colnames(knn_test_results) <- make.names(colnames(knn_test_results))
+colnames(nb_test_results) <- make.names(colnames(nb_test_results))
+colnames(rf_test_results) <- make.names(colnames(rf_test_results))
+colnames(xgb_test_results) <- make.names(colnames(xgb_test_results))
+```
+
+#### Null Model
+
+For this classification problem the classes are relatively unbalanced. For this reason, a good choice (and indeed, the standard choice) for the null model is the model which predicts the mode (most frequently occurring class), name `"Existing Customer"`, in other words, predicting no customer attrition (this makes sense, as it is a relatively rare event).
+
+```{r create_null_model, echo=FALSE, warnings=FALSE, messages=FALSE}
+# get ground truth class labels for null model
+null_test_results <- 
+  test_set %>%
+  select(Attrition_Flag)
+
+# predict no customer
+null_test_results$.pred_Attrited.Customer <- 0
+null_test_results$.pred_Existing.Customer <- 1
+```
+
+#### ROC Curves
+
+Here are the ROC curves for test data predictions of the five baseline models 
+
+```{r get_roc_data, echo=FALSE, warnings=FALSE, messages=FALSE}
+# create data frames to store ROC AUC calculations for each probability threshold
+roc_data <- data.frame(threshold=seq(1,0,-0.01), lr_fpr=0, knn_tpr=0)
+
+for (i in roc_data$threshold) {
+  # subset the test result based on which predictions are over the threshold i
+  lr_over_threshold <- lr_test_results[lr_test_results$.pred_Attrited.Customer >= i, ]
+  knn_over_threshold <- knn_test_results[knn_test_results$.pred_Attrited.Customer >= i, ]
+  nb_over_threshold <- nb_test_results[nb_test_results$.pred_Attrited.Customer >= i, ]
+  rf_over_threshold <- rf_test_results[rf_test_results$.pred_Attrited.Customer >= i, ]
+  xgb_over_threshold <- xgb_test_results[xgb_test_results$.pred_Attrited.Customer >= i, ]
+ 
+  # get the predicted negative class for each model
+  lr_pred_neg <- sum(lr_over_threshold$Attrition_Flag=="Existing Customer")
+  knn_pred_neg <- sum(knn_over_threshold$Attrition_Flag=="Existing Customer")
+  nb_pred_neg <- sum(nb_over_threshold$Attrition_Flag=="Existing Customer")
+  rf_pred_neg <- sum(rf_over_threshold$Attrition_Flag=="Existing Customer")
+  xgb_pred_neg <- sum(xgb_over_threshold$Attrition_Flag=="Existing Customer")
+  
+  
+  # get the predicted positive class for each model
+  lr_pred_pos <- sum(lr_over_threshold$Attrition_Flag=="Attrited Customer")
+  knn_pred_pos <- sum(knn_over_threshold$Attrition_Flag=="Attrited Customer")
+  nb_pred_pos <- sum(nb_over_threshold$Attrition_Flag=="Attrited Customer")
+  rf_pred_pos <- sum(rf_over_threshold$Attrition_Flag=="Attrited Customer")
+  xgb_pred_pos <- sum(xgb_over_threshold$Attrition_Flag=="Attrited Customer")
+  
+  # get the true positives and negatives (same for each model)
+  true_neg <- sum(lr_test_results$Attrition_Flag=="Existing Customer")
+  true_pos <- sum(lr_test_results$Attrition_Flag=="Attrited Customer")
+  
+  # compute false and true positive rates and store in roc_data tibble
+  lr_fpr <- lr_pred_neg/true_neg
+  knn_fpr <- knn_pred_neg/true_neg
+  nb_fpr <- nb_pred_neg/true_neg
+  rf_fpr <- rf_pred_neg/true_neg
+  xgb_fpr <- xgb_pred_neg/true_neg
+  roc_data[roc_data$threshold==i, "lr_fpr"] <- lr_fpr
+  roc_data[roc_data$threshold==i, "knn_fpr"] <- knn_fpr
+  roc_data[roc_data$threshold==i, "nb_fpr"] <- nb_fpr
+  roc_data[roc_data$threshold==i, "rf_fpr"] <- rf_fpr
+  roc_data[roc_data$threshold==i, "xgb_fpr"] <- xgb_fpr
+  
+  lr_tpr <- lr_pred_pos/true_pos
+  knn_tpr <- knn_pred_pos/true_pos
+  nb_tpr <- nb_pred_pos/true_pos
+  rf_tpr <- rf_pred_pos/true_pos
+  xgb_tpr <- xgb_pred_pos/true_pos
+  
+  roc_data[roc_data$threshold==i, "lr_tpr"] <- lr_tpr
+  roc_data[roc_data$threshold==i, "knn_tpr"] <- knn_tpr
+  roc_data[roc_data$threshold==i, "nb_tpr"] <- nb_tpr
+  roc_data[roc_data$threshold==i, "rf_tpr"] <- rf_tpr
+  roc_data[roc_data$threshold==i, "xgb_tpr"] <- xgb_tpr
+  
+}
+```
+
+```{r plot_lr_roc_curve, echo=FALSE, warnings=FALSE, messages=FALSE, fig.height=4, fig.width=8}
+
+# create custom color palettes
+blue_palette <- colorRampPalette(c("lightblue", "blue", "darkblue"))
+
+# create three color palette for plot
+blues <- blue_palette(3)
+
+lr_plot <- ggplot() +
+  geom_line(data = roc_data, aes(x = lr_fpr, y = lr_tpr, color = threshold), linewidth = 2) +
+  scale_color_gradientn(colors=blues) +
+  geom_abline(intercept = 0, slope = 1, lty = 2) +
+  geom_point(data = roc_data[seq(1, 101, 10), ], aes(x = lr_fpr, y = lr_tpr)) +
+  geom_text(data = roc_data[seq(1, 101, 10), ],
+            aes(x = lr_fpr, y = lr_tpr, label = threshold, hjust = 1.2, vjust = -0.2)) +
+  labs(
+    title = "ROC Curve (Logistic Regression)",
+    subtitle = "",
+    caption = "",
+    x = "False Positive Rate (Positive Class: 'Attrited Customer')",
+    y = "True Positive Rate"
+  )
+
+lr_plot
+```
+
+```{r plot_knn_roc_curve, echo=FALSE, warnings=FALSE, messages=FALSE, fig.height=4, fig.width=8}
+
+# create custom color palettes
+blue_palette <- colorRampPalette(c("lightblue", "blue", "darkblue"))
+
+# create three color palette for plot
+blues <- blue_palette(3)
+
+knn_plot <- ggplot() +
+  geom_line(data = roc_data, aes(x = knn_fpr, y = knn_tpr, color = threshold), linewidth = 2) +
+  scale_color_gradientn(colors=blues) +
+  geom_abline(intercept = 0, slope = 1, lty = 2) +
+  geom_point(data = roc_data[seq(1, 101, 10), ], aes(x = knn_fpr, y = knn_tpr)) +
+  geom_text(data = roc_data[seq(1, 101, 10), ],
+            aes(x = knn_fpr, y = knn_tpr, label = threshold, hjust = 1.2, vjust = -0.2)) +
+  labs(
+    title = "ROC Curve (K-Nearest Neighbors)",
+    subtitle = "",
+    caption = "",
+    x = "False Positive Rate (Positive Class: 'Attrited Customer')",
+    y = "True Positive Rate"
+  )
+
+knn_plot
+```
+
+```{r plot_nb_roc_curve, echo=FALSE, warnings=FALSE, messages=FALSE, fig.height=4, fig.width=8}
+
+# create custom color palettes
+blue_palette <- colorRampPalette(c("lightblue", "blue", "darkblue"))
+
+# create three color palette for plot
+blues <- blue_palette(3)
+
+nb_plot <- ggplot() +
+  geom_line(data = roc_data, aes(x = nb_fpr, y = nb_tpr, color = threshold), linewidth = 2) +
+  scale_color_gradientn(colors=blues) +
+  geom_abline(intercept = 0, slope = 1, lty = 2) +
+  geom_point(data = roc_data[seq(1, 101, 10), ], aes(x = nb_fpr, y = nb_tpr)) +
+  geom_text(data = roc_data[seq(1, 101, 10), ],
+            aes(x = nb_fpr, y = nb_tpr, label = threshold, hjust = 1.2, vjust = -0.2)) +
+  labs(
+    title = "ROC Curve (Naive Bayes)",
+    subtitle = "",
+    caption = "",
+    x = "False Positive Rate (Positive Class: 'Attrited Customer')",
+    y = "True Positive Rate"
+  )
+
+nb_plot
+```
+
+```{r plot_rf_roc_curve, echo=FALSE, warnings=FALSE, messages=FALSE, fig.height=4, fig.width=8}
+
+# create custom color palettes
+blue_palette <- colorRampPalette(c("lightblue", "blue", "darkblue"))
+
+# create three color palette for plot
+blues <- blue_palette(3)
+
+rf_plot <- ggplot() +
+  geom_line(data = roc_data, aes(x = rf_fpr, y = rf_tpr, color = threshold), linewidth = 2) +
+  scale_color_gradientn(colors=blues) +
+  geom_abline(intercept = 0, slope = 1, lty = 2) +
+  geom_point(data = roc_data[seq(1, 101, 10), ], aes(x = rf_fpr, y = rf_tpr)) +
+  geom_text(data = roc_data[seq(1, 101, 10), ],
+            aes(x = rf_fpr, y = rf_tpr, label = threshold, hjust = 1.2, vjust = -0.2)) +
+  labs(
+    title = "ROC Curve (Random Forest)",
+    subtitle = "",
+    caption = "",
+    x = "False Positive Rate (Positive Class: 'Attrited Customer')",
+    y = "True Positive Rate"
+  )
+
+rf_plot
+```
+
+```{r plot_xgb_roc_curve, echo=FALSE, warnings=FALSE, messages=FALSE, fig.height=4, fig.width=8}
+
+# create custom color palettes
+blue_palette <- colorRampPalette(c("lightblue", "blue", "darkblue"))
+
+# create three color palette for plot
+blues <- blue_palette(3)
+
+xgb_plot <- ggplot() +
+  geom_line(data = roc_data, aes(x = xgb_fpr, y = xgb_tpr, color = threshold), linewidth = 2) +
+  scale_color_gradientn(colors=blues) +
+  geom_abline(intercept = 0, slope = 1, lty = 2) +
+  geom_point(data = roc_data[seq(1, 101, 10), ], aes(x = xgb_fpr, y = xgb_tpr)) +
+  geom_text(data = roc_data[seq(1, 101, 10), ],
+            aes(x = xgb_fpr, y = xgb_tpr, label = threshold, hjust = 1.2, vjust = -0.2)) +
+  labs(
+    title = "ROC Curve (XGBoost)",
+    subtitle = "",
+    caption = "",
+    x = "False Positive Rate (Positive Class: 'Attrited Customer')",
+    y = "True Positive Rate"
+  )
+
+xgb_plot
+```
+
+From these plots, we can see that the random forest classifier has the best ROC-AUC on the test data. This may be a bit expected, since the `XGBoost` mean ROC AUC found during cross-validation was highest.
+
+This shows that random forest is much better than all other models at predicting the positive class at all probability thresholds, which indicates it is overall better suited to this data set as a predictive model.
+
+#### Calibration Curves
+
+Here are the calibration curves for test data predictions of the five baseline models 
+
+```{r, echo=FALSE, warnings=FALSE, messages=FALSE, fig.height=4, fig.width=8}
+# initialize data frames for tracking calculation
+lr_calibration_data <- data.frame(bin_midpoint=seq(0.05,0.95,0.1),
+                                  observed_event_percentage=0,
+                                  classifier="LR")
+knn_calibration_data <- data.frame(bin_midpoint=seq(0.05,0.95,0.1),
+                                   observed_event_percentage=0,
+                                   classifier="KNN")
+nb_calibration_data <- data.frame(bin_midpoint=seq(0.05,0.95,0.1),
+                                   observed_event_percentage=0,
+                                   classifier="NB")
+rf_calibration_data <- data.frame(bin_midpoint=seq(0.05,0.95,0.1),
+                                   observed_event_percentage=0,
+                                   classifier="RF")
+xgb_calibration_data <- data.frame(bin_midpoint=seq(0.05,0.95,0.1),
+                                   observed_event_percentage=0,
+                                   classifier="XGB")
+
+for (i in seq(0.05,0.95,0.1)) {
+  
+  lr_in_interval <- lr_test_results[lr_test_results$.pred_Attrited.Customer >= (i-0.05) & lr_test_results$.pred_Attrited.Customer <= (i+0.05), ]
+  lr_oep <- round(nrow(lr_in_interval[lr_in_interval$Attrition_Flag=="Attrited Customer", ])/nrow(lr_in_interval), 2)
+  lr_calibration_data[lr_calibration_data$bin_midpoint==i, "observed_event_percentage"] <- lr_oep
+  
+  knn_in_interval <- knn_test_results[knn_test_results$.pred_Attrited.Customer >= (i-0.05) & knn_test_results$.pred_Attrited.Customer <= (i+0.05), ]
+  knn_oep <- round(nrow(knn_in_interval[knn_in_interval$Attrition_Flag=="Attrited Customer", ])/nrow(knn_in_interval), 2)
+  knn_calibration_data[knn_calibration_data$bin_midpoint==i, "observed_event_percentage"] <- knn_oep
+  
+  nb_in_interval <- nb_test_results[nb_test_results$.pred_Attrited.Customer >= (i-0.05) & nb_test_results$.pred_Attrited.Customer <= (i+0.05), ]
+  nb_oep <- round(nrow(nb_in_interval[nb_in_interval$Attrition_Flag=="Attrited Customer", ])/nrow(nb_in_interval), 2)
+  nb_calibration_data[nb_calibration_data$bin_midpoint==i, "observed_event_percentage"] <- nb_oep
+  
+  rf_in_interval <- rf_test_results[rf_test_results$.pred_Attrited.Customer >= (i-0.05) & rf_test_results$.pred_Attrited.Customer <= (i+0.05), ]
+  rf_oep <- round(nrow(rf_in_interval[rf_in_interval$Attrition_Flag=="Attrited Customer", ])/nrow(rf_in_interval), 2)
+  rf_calibration_data[rf_calibration_data$bin_midpoint==i, "observed_event_percentage"] <- rf_oep
+  
+  xgb_in_interval <- xgb_test_results[xgb_test_results$.pred_Attrited.Customer >= (i-0.05) & xgb_test_results$.pred_Attrited.Customer <= (i+0.05), ]
+  xgb_oep <- round(nrow(xgb_in_interval[xgb_in_interval$Attrition_Flag=="Attrited Customer", ])/nrow(xgb_in_interval), 2)
+  xgb_calibration_data[xgb_calibration_data$bin_midpoint==i, "observed_event_percentage"] <- xgb_oep
+}
+
+ggplot() +
+  geom_line(data = lr_calibration_data, 
+            aes(x = bin_midpoint, y = observed_event_percentage, color= classifier)
+            ) +
+  geom_line(data = knn_calibration_data, 
+            aes(x = bin_midpoint, y = observed_event_percentage, color= classifier)
+            ) +
+  geom_line(data = nb_calibration_data, 
+            aes(x = bin_midpoint, y = observed_event_percentage, color= classifier)
+            ) +
+  geom_line(data = rf_calibration_data, 
+            aes(x = bin_midpoint, y = observed_event_percentage, color= classifier)
+            ) +
+  geom_line(data = xgb_calibration_data, 
+            aes(x = bin_midpoint, y = observed_event_percentage, color= classifier)
+            ) +
+  geom_point(data = lr_calibration_data, 
+            aes(x = bin_midpoint, y = observed_event_percentage, color= classifier), 
+            size = 2) +
+  geom_point(data = knn_calibration_data, 
+            aes(x = bin_midpoint, y = observed_event_percentage, color= classifier), 
+            size = 2) +
+  geom_point(data = nb_calibration_data, 
+            aes(x = bin_midpoint, y = observed_event_percentage, color= classifier), 
+            size = 2) +
+  geom_point(data = rf_calibration_data, 
+            aes(x = bin_midpoint, y = observed_event_percentage, color= classifier), 
+            size = 2) +
+  geom_point(data = xgb_calibration_data, 
+            aes(x = bin_midpoint, y = observed_event_percentage, color= classifier), 
+            size = 2) +
+  geom_text(data = lr_calibration_data, 
+            aes(x = bin_midpoint, y = observed_event_percentage, label = observed_event_percentage),
+            hjust = 0.75, vjust = -0.5, color = "darkblue", size=3) +  
+  geom_text(data = knn_calibration_data, 
+            aes(x = bin_midpoint, y = observed_event_percentage, label = observed_event_percentage),
+            hjust = 0.75, vjust = -0.5, color = "darkgreen", size=3) + 
+  geom_text(data = nb_calibration_data, 
+            aes(x = bin_midpoint, y = observed_event_percentage, label = observed_event_percentage),
+            hjust = 0.75, vjust = -0.5, color = "darkorange", size=3) +
+  geom_text(data = rf_calibration_data, 
+            aes(x = bin_midpoint, y = observed_event_percentage, label = observed_event_percentage),
+            hjust = 0.75, vjust = -0.5, color = "darkred", size=3) +
+  geom_text(data = xgb_calibration_data, 
+            aes(x = bin_midpoint, y = observed_event_percentage, label = observed_event_percentage),
+            hjust = 0.75, vjust = -0.5, color = "purple", size=3) +
+  scale_color_manual(values = c("LR" = "darkblue", "KNN" = "darkgreen", "NB" = 'darkorange', 'RF' = 'darkred', 'XGB'= 'purple')) +
+  geom_abline(intercept = 0, slope = 1, lty = 2) +
+  scale_x_continuous(breaks = seq(0, 1, 0.2), labels = seq(0, 1, 0.2)) +
+  scale_y_continuous(breaks = seq(0, 1, 0.2), labels = seq(0, 1, 0.2)) +
+  labs(
+    title = "Calibration Curves",
+    subtitle = "",
+    caption = "",
+    x = "Mean Predicted Probability (Positive Class: 'Attrited Customer')",
+    y = "Fraction of Positives"
+  )
+```
+The calibration curves provide strong evidence against the suitability of naive Bayes, which has a wild curve. The other models have more well-behaved calibration curves, with logistic regression and random forest clearly the best.
+
+#### Accuracy
+
+Here is the overall accuracy -- i.e. the percentage of correctly classified customers -- for the test data.
+
+```{r get_acc_results, echo=FALSE, warnings=FALSE, messages=FALSE}
+# create tibble with predictions from both models for probability threshold of 0.5
+preds <- tibble(True=ifelse(null_test_results$Attrition_Flag == "Attrited Customer", 1, 0),
+                Null=null_test_results$.pred_Attrited.Customer,
+                LR=as.integer(lr_test_results$.pred_Attrited.Customer >= 0.5),
+                KNN=as.integer(knn_test_results$.pred_Attrited.Customer >= 0.5),
+                NB=as.integer(nb_test_results$.pred_Attrited.Customer >= 0.5),
+                RF=as.integer(rf_test_results$.pred_Attrited.Customer >= 0.5),
+                XGB=as.integer(xgb_test_results$.pred_Attrited.Customer >= 0.5))
+
+null_acc <- sum(preds$Null == preds$True)/dim(preds)[1]
+lr_acc <- sum(preds$LR == preds$True)/dim(preds)[1]
+knn_acc <- sum(preds$KNN == preds$True)/dim(preds)[1]
+nb_acc <- sum(preds$NB == preds$True)/dim(preds)[1]
+rf_acc <- sum(preds$RF == preds$True)/dim(preds)[1]
+xgb_acc <- sum(preds$XGB == preds$True)/dim(preds)[1]
+
+acc_results <- tibble(Model=c("Null Model", "Logistic Regression", "K-Nearest Neighbors", "Naive Bayes",
+                              "Random Forest", "XGBoost"),
+                      accuracy=c(null_acc, lr_acc, knn_acc, nb_acc, rf_acc, xgb_acc)) %>%
+                arrange(desc(accuracy))
+  
+acc_results
+```
+
+In terms of overall accuracy, random forest is the clear winner. 
+
+Note that the accuracy of the null model is relatively high, reflecting the imbalance of the classes, that is, the dominance of the existing customers in the data set. Note the proportion of the existing (non-attrited) customers in the data set is exactly the null model accuracy.
+
+### Summary and Interpretation of Findings
+
+The results of the last section indicate that the random forest model is the best choice, with best test ROC-AUC, a top two calibration curve, and best test accuracy, so we select this as the final model for interpretation.
+
+#### Feature Importances
+
+The first step for interpretation is the feature importances. 
+
+Note that, although feature engineering resulted in a total of 24 features, which is a low enough number to practically view all feature importances, the feature encoding, particularly the one-hot encoding, increased this number substantially, so it is not practically feasible all the importances.
+
+```{r plot_feat_imp, echo=FALSE, warnings=FALSE, messages=FALSE}
+fitted_model <- best_rf_fit %>%
+  extract_fit_engine()  #extract the model from a fit object
+
+# Use vip on the extracted fitted model
+vip(fitted_model, num_features = 20)
+```
+
+A few observations and remarks:
+
+1. Total amount and number of transactions were the most importance features, by a good margin, followed by total revolving balance, and total change in number of transactions from Q1 to Q4.
+2. All four engineered features proved important, including transaction frequency, average amount per transaction, average monthly spending and credit use ratio.
+3. Demographic variables were clearly less important than financial and transaction variables.
+
+## Recommendations
+
+***SIDEKICK: TO DO - Discuss***
+
+### Future Work
+
+Here are some suggested steps that could be taken to improve the predictive model.
+
+1. Gather data on more customers
+2. Add additional features which have predictive value (these could be tested against their relationship to churn before being added to the customer database)
+3. Explore more thoroughly the relationship between features and the target, for example with bivariate plots and stastistical hypothesis tests.
+4. Recode some of the categorical features with natural orderings as ordinal features, for example `Education_Level` and `Income_Category`.
+5. Expand hyperparameter tuning to explore more of the search space or additional hyperparameters.
+
+
+## Appendix [Optional]
+
+> Any additional details such as parts of the output you consider worthwhile but not appropriate for inclusion in the body of the report. It is important to make sure, however, that only outcomes that are referenced elsewhere in your report and/or are necessary to understand the details of the work are included - **inclusion of unrelated or unnecessary (to communicating or explaining of results) outcomes will adversely impact the final report grade.**
+
+***SIDEKICK: TO DO - Discuss.***
+
+***SIDEKICK: TO DO - Move technical discussion of feature engineering here, e.g. feature name, strategy taken (transformation or binning) and reason.***

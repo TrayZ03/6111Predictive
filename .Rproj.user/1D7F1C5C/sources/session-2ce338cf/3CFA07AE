@@ -1,0 +1,28 @@
+{
+    "id": "3CFA07AE",
+    "path": null,
+    "project_path": null,
+    "type": "object_explorer",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1713669775495.0,
+    "source_on_save": false,
+    "relative_order": 7,
+    "properties": {
+        "id": "1c8d68b5b5484e69852f2501822ec21e",
+        "name": "best_lr_fit",
+        "title": "best_lr_fit",
+        "language": "R",
+        "source_window_id": "",
+        "Source": "Source"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 481036337153,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1713669775495,
+    "read_only": false,
+    "read_only_alternatives": []
+}

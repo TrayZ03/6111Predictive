@@ -1,0 +1,5 @@
+"0","mar_status_dist <- cleaned_data %>%"
+"0","  group_by(Marital_Status) %>%"
+"0","  summarize(Count=n()) %>%"
+"0","  mutate(Proportion=round(Count/sum(Count), 2))"
+"0","mar_status_dist"

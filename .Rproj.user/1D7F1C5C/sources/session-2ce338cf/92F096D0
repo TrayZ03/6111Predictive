@@ -1,0 +1,28 @@
+{
+    "id": "92F096D0",
+    "path": null,
+    "project_path": null,
+    "type": "object_explorer",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1713669795451.0,
+    "source_on_save": false,
+    "relative_order": 8,
+    "properties": {
+        "id": "3944078d45d04b4b8dc1e2859df550f0",
+        "name": "best_lr_mod",
+        "title": "best_lr_mod",
+        "language": "R",
+        "source_window_id": "",
+        "Source": "Source"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 481036337153,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1713669795451,
+    "read_only": false,
+    "read_only_alternatives": []
+}

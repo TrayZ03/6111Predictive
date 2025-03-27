@@ -1,0 +1,28 @@
+{
+    "id": "4697B74B",
+    "path": null,
+    "project_path": null,
+    "type": "object_explorer",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1713669769476.0,
+    "source_on_save": false,
+    "relative_order": 6,
+    "properties": {
+        "id": "2846c9b931234d9badcfcc2ac19a5179",
+        "name": "best_knn_mod",
+        "title": "best_knn_mod",
+        "language": "R",
+        "source_window_id": "",
+        "Source": "Source"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1713662721,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1713669769476,
+    "read_only": false,
+    "read_only_alternatives": []
+}

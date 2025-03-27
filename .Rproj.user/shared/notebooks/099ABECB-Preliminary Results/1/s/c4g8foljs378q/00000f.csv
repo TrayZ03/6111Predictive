@@ -1,0 +1,51 @@
+"0","# install libraries - un-comment if needed"
+"0","# install.packages(""tidyverse"")"
+"0","# install.packages(""kableExtra"")"
+"0","# install.packages(""leaps"")"
+"0","# install.packages(""caret"")"
+"0","# install.packages(""tidymodels"")"
+"0","# install.packages(""recipes"")"
+"0","# install.packages(""kknn"")"
+"0","# install.packages(""glmnet"")"
+"0",""
+"0","# load libraries"
+"0","library(tidyverse)"
+"0","library(kableExtra)"
+"2","
+Attaching package: ‘kableExtra’
+
+"
+"2","The following object is masked from ‘package:dplyr’:
+
+    group_rows
+
+"
+"0","library(leaps)"
+"0","library(caret)"
+"0","library(tidymodels)"
+"0","library(recipes)"
+"0","library(kknn)"
+"2","
+Attaching package: ‘kknn’
+
+"
+"2","The following object is masked from ‘package:caret’:
+
+    contr.dummy
+
+"
+"0","library(glmnet)"
+"2","Loading required package: Matrix
+"
+"2","
+Attaching package: ‘Matrix’
+
+"
+"2","The following objects are masked from ‘package:tidyr’:
+
+    expand, pack, unpack
+
+"
+"2","Loaded glmnet 4.1-8
+"
+"0","tidymodels_prefer()"

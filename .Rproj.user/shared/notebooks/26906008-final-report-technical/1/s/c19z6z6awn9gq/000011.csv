@@ -1,0 +1,5 @@
+"0","fitted_model <- best_rf_fit %>%"
+"0","  extract_fit_engine()  #extract the model from a fit object"
+"0",""
+"0","# Use vip on the extracted fitted model"
+"0","vip(fitted_model, num_features = 20)"

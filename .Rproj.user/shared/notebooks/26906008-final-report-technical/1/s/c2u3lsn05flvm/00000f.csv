@@ -1,0 +1,5 @@
+"0","var_obs_ratio = round(dim(model_data)[2]/dim(model_data)[1], 3)"
+"0","cat(""Ratio of features to observations is"", var_obs_ratio)"
+"1","Ratio of features to observations is"
+"1"," "
+"1","0.002"

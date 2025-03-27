@@ -1,0 +1,9 @@
+"0","nb_results <- tune_model(nb_workflow, nb_grid, ""Naive Bayes"")"
+"1","[1m[33mError[39m in `check_grid()`:[22m
+[33m![39m The provided `grid` is missing the following parameter columns that have been marked for tuning by `tune()`: 'Laplace'.
+Backtrace:
+[90m 1. [39m[1mglobal[22m tune_model(nb_workflow, nb_grid, ""Naive Bayes"")
+[90m 4. [39m[1mtune[22m:::tune_grid.workflow(...)
+[90m 5. [39mtune:::tune_grid_workflow(...)
+[90m 6. [39m[1m[94mtune:::check_grid([39m[22mgrid = grid, workflow = workflow, pset = pset[1m[94m)[39m[22m
+"

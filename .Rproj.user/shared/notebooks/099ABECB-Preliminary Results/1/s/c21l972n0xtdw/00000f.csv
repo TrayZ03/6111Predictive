@@ -1,0 +1,8 @@
+"0","cv_set <- vfold_cv(training_set, strata = ""Attrition_Flag"", v = 10)"
+"0",""
+"0","lr_workflow <- "
+"0","  workflow() %>% "
+"0","  add_recipe(pine_recipe) %>%"
+"0","  add_model(lr_mod)"
+"2","Error: object 'lr_mod' not found
+"

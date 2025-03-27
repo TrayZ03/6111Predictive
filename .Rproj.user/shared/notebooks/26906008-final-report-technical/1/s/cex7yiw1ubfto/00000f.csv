@@ -1,0 +1,2 @@
+"0","model_data %>%"
+"0","  summarise(across(everything(), ~sum(is.na(.), na.rm = FALSE)))"

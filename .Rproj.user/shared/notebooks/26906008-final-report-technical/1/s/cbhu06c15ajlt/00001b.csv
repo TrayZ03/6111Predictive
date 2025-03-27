@@ -1,0 +1,16 @@
+"0",""
+"0","# read data dictionary into tibble"
+"0","data_dict <- read_tsv('project_data_dictionary.txt') %>%"
+"0","  rename(Feature=Variable)"
+"2","[1mRows: [22m[34m21[39m [1mColumns: [22m[34m2[39m"
+"2","[36m──[39m [1mColumn specification[22m [36m───────────────────────────────────────────────────────────────────────────────[39m
+[1mDelimiter:[22m ""\t""
+[31mchr[39m (2): Variable, Definition"
+"2","
+[36mℹ[39m Use `spec()` to retrieve the full column specification for this data.
+[36mℹ[39m Specify the column types or set `show_col_types = FALSE` to quiet this message."
+"0","# create table with kable, and modify heights - this print nicely and gets all columns on same page"
+"0","kable(data_dict, ""html"") %>%"
+"0","  kable_styling(""striped"", full_width = TRUE, font_size=12) %>%"
+"0","  column_spec(1, width = ""500px"") %>%  # Adjust width as needed"
+"0","  column_spec(2, width = ""500px"")      # Adjust width as needed"

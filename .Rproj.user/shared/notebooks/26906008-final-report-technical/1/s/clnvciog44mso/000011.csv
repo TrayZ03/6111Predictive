@@ -1,0 +1,21 @@
+"0","# summarize the data by grouping to get the counts"
+"0","data_summary <- model_data %>%"
+"0","  group_by(Attrition_Flag, Card_Category) %>%"
+"0","  summarise(Count = n(), .groups = 'drop') %>%"
+"0","  mutate(Proportion=round(Count/sum(Count), 2))"
+"0",""
+"0","# create the plotly plot"
+"0","p <- plot_ly(data = data_summary, x = ~Attrition_Flag, y = ~Proportion, type = 'bar', color = ~Card_Category) %>%"
+"0","  plotly::layout(yaxis = list(title = 'Proportion'),"
+"0","                 title = 'Joint Dataset Distribution of Customer Attrition and Card Category',"
+"0","                 barmode = 'stack')"
+"0",""
+"0","p"
+"2","Warning: minimal value for n is 3, returning requested palette with 3 different levels
+"
+"2","Warning: minimal value for n is 3, returning requested palette with 3 different levels
+"
+"2","Warning: minimal value for n is 3, returning requested palette with 3 different levels
+"
+"2","Warning: minimal value for n is 3, returning requested palette with 3 different levels
+"

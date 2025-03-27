@@ -1,0 +1,5 @@
+"0","attr_dist <- cleaned_data %>%"
+"0","  group_by(Attrition_Flag) %>% # group by feature"
+"0","  summarize(Count=n()) %>% # summarize by count to get frequency"
+"0","  mutate(Proportion=round(Count/sum(Count), 2)) # mutation to convert frequency to a proportion"
+"0","attr_dist"

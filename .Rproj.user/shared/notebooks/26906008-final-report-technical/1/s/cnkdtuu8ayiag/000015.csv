@@ -1,0 +1,4 @@
+"0","cleaned_data %>% "
+"0","  group_by(Months_on_book) %>% # group by feature"
+"0","  summarize(Count = n()) %>% # summarize by counting"
+"0","  filter(Count == max(Count)) # pull the row in the summary tibble where the value is maximum"

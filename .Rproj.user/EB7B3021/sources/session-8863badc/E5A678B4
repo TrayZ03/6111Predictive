@@ -1,0 +1,32 @@
+{
+    "id": "E5A678B4",
+    "path": "/cloud/project/final-report-technical.Rmd",
+    "project_path": "final-report-technical.Rmd",
+    "type": "r_markdown",
+    "hash": "0",
+    "contents": "",
+    "dirty": true,
+    "created": 1714485981740.0,
+    "source_on_save": false,
+    "relative_order": 4,
+    "properties": {
+        "tempName": "Untitled1",
+        "chunk_output_type": "inline",
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "1457,17",
+        "scrollLine": "0",
+        "docOutlineVisible": "1",
+        "ignored_words": "attrited,dataset,multimodal,preprocessing,hyperparameters,XGBoost,hyperparameter,accuracies,importances\n",
+        "quartoPreviewFormat": "word",
+        "docOutlineSize": "160"
+    },
+    "folds": "27|59|69|0|\n",
+    "lastKnownWriteTime": 1714919684,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1719601811425,
+    "read_only": false,
+    "read_only_alternatives": []
+}

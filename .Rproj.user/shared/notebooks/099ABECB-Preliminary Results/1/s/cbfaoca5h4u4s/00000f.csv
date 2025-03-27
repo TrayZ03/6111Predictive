@@ -1,0 +1,7 @@
+"0","top_lr_models <-"
+"0","  lr_results %>% "
+"0","  show_best(metric = ""roc_auc"", n = 10) %>% "
+"0","  rename(mean_roc_auc=mean,"
+"0","         std_err_roc_auc=std_err) %>%"
+"0","  select(penalty, mean_roc_auc, std_err_roc_auc)"
+"0","top_lr_models"
